@@ -19,7 +19,7 @@ export function formatCredentialCost(
   billingCycle: BillingCycle | null,
 ): string | null {
   if (cost == null) return null;
-  const formatted = new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(
+  const formatted = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
     cost,
   );
   return billingCycle ? `${formatted}${BILLING_CYCLE_SUFFIX[billingCycle]}` : formatted;
