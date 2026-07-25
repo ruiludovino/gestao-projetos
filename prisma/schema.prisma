@@ -1,0 +1,486 @@
+// Schema Prisma - Aplicacao de Gestao de Projetos
+// PostgreSQL (Neon), pensado para multi-projeto e multi-membro desde o inicio.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Neon: DATABASE_URL = connection pooling (pgbouncer), DIRECT_URL = ligacao direta para migrations
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Autenticacao (NextAuth / Auth.js - modelos exigidos pelo PrismaAdapter)
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String? // null quando o utilizador so usa GitHub OAuth
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  projectMemberships ProjectMember[]
+  createdProjects    Project[]       @relation("ProjectCreatedBy")
+
+  reportedBugs   Bug[]           @relation("BugReporter")
+  assignedBugs   Bug[]           @relation("BugAssignee")
+  assignedTasks  Task[]          @relation("TaskAssignee")
+  comments       Comment[]
+  attachments    Attachment[]
+  notes          Note[]          @relation("NoteCreatedBy")
+  noteVersions   NoteVersion[]
+  credentials    Credential[]    @relation("CredentialCreatedBy")
+  notifications  Notification[]
+  activityLogs   ActivityLog[]
+  connectedRepos GithubRepo[]    @relation("GithubRepoConnectedBy")
+
+  @@map("users")
+}
+
+model Account {
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String? @db.Text
+  access_token             String? @db.Text
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String? @db.Text
+  session_state            String?
+  refresh_token_expires_in Int?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Projetos e membros
+// ---------------------------------------------------------------------------
+
+enum ProjectRole {
+  ADMIN // gere membros, credenciais, definicoes, pode arquivar o projeto
+  DEVELOPER // cria/edita bugs, tarefas, notas, ve credenciais
+  VIEWER // apenas leitura, sem acesso ao cofre de credenciais
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  archived    Boolean  @default(false)
+
+  // contadores para gerar identificadores sequenciais legiveis (BUG-1, TASK-1, ...)
+  bugSeq  Int @default(0)
+  taskSeq Int @default(0)
+
+  createdById String
+  createdBy   User   @relation("ProjectCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members      ProjectMember[]
+  bugs         Bug[]
+  tasks        Task[]
+  credentials  Credential[]
+  notes        Note[]
+  noteFolders  NoteFolder[]
+  labels       Label[]
+  githubRepos  GithubRepo[]
+  activityLogs ActivityLog[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  projectId String
+  userId    String
+  role      ProjectRole @default(DEVELOPER)
+
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+// ---------------------------------------------------------------------------
+// Labels (partilhadas entre bugs e tarefas dentro do mesmo projeto)
+// ---------------------------------------------------------------------------
+
+model Label {
+  id        String @id @default(cuid())
+  projectId String
+  name      String
+  color     String @default("#64748b")
+
+  project Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bugs    BugLabel[]
+
+  @@unique([projectId, name])
+  @@map("labels")
+}
+
+// ---------------------------------------------------------------------------
+// Bugs / Erros
+// ---------------------------------------------------------------------------
+
+enum Priority {
+  CRITICA
+  ALTA
+  MEDIA
+  BAIXA
+}
+
+enum BugStatus {
+  ABERTO
+  EM_PROGRESSO
+  RESOLVIDO
+  FECHADO
+}
+
+model Bug {
+  id          String    @id @default(cuid())
+  number      Int // identificador sequencial dentro do projeto (BUG-{number})
+  projectId   String
+  title       String
+  description String    @db.Text // markdown
+  priority    Priority  @default(MEDIA)
+  status      BugStatus @default(ABERTO)
+
+  reporterId String
+  assigneeId String?
+
+  githubIssueNumber Int?
+  githubIssueUrl    String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  closedAt  DateTime?
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter    User         @relation("BugReporter", fields: [reporterId], references: [id])
+  assignee    User?        @relation("BugAssignee", fields: [assigneeId], references: [id])
+  comments    Comment[]
+  attachments Attachment[]
+  labels      BugLabel[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@map("bugs")
+}
+
+model BugLabel {
+  bugId   String
+  labelId String
+
+  bug   Bug   @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([bugId, labelId])
+  @@map("bug_labels")
+}
+
+// ---------------------------------------------------------------------------
+// Tarefas (Kanban + subtarefas)
+// ---------------------------------------------------------------------------
+
+enum TaskStatus {
+  TODO
+  DOING
+  DONE
+}
+
+enum GithubLinkType {
+  ISSUE
+  PR
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  number      Int
+  projectId   String
+  title       String
+  description String?    @db.Text
+  priority    Priority   @default(MEDIA)
+  status      TaskStatus @default(TODO)
+  position    Int        @default(0) // ordem dentro da coluna do kanban
+  deadline    DateTime?
+
+  assigneeId String?
+
+  parentTaskId String?
+  parentTask   Task?   @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks     Task[]  @relation("Subtasks")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  comments    Comment[]
+  githubLinks TaskGithubLink[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@map("tasks")
+}
+
+model TaskGithubLink {
+  id     String         @id @default(cuid())
+  taskId String
+  type   GithubLinkType
+  number Int
+  url    String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, type, number])
+  @@map("task_github_links")
+}
+
+// ---------------------------------------------------------------------------
+// Comentarios e anexos (partilhados por Bug e Task)
+// ---------------------------------------------------------------------------
+
+model Comment {
+  id     String  @id @default(cuid())
+  body   String  @db.Text
+  bugId  String?
+  taskId String?
+
+  authorId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bug    Bug?  @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  task   Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id])
+
+  @@index([bugId])
+  @@index([taskId])
+  @@map("comments")
+}
+
+model Attachment {
+  id       String @id @default(cuid())
+  bugId    String
+  url      String
+  filename String
+  mimeType String
+  size     Int
+
+  uploadedById String
+
+  createdAt DateTime @default(now())
+
+  bug        Bug  @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  uploadedBy User @relation(fields: [uploadedById], references: [id])
+
+  @@index([bugId])
+  @@map("attachments")
+}
+
+// ---------------------------------------------------------------------------
+// Credenciais (Cofre Seguro) - passwords sempre encriptadas com AES-256-GCM
+// ---------------------------------------------------------------------------
+
+model Credential {
+  id          String  @id @default(cuid())
+  projectId   String
+  serviceName String
+  url         String?
+  username    String?
+
+  // AES-256-GCM: guardamos ciphertext + iv + authTag separados, nunca a password em claro
+  passwordCiphertext String
+  passwordIv         String
+  passwordAuthTag    String
+
+  // notas tambem encriptadas (podem conter dados sensiveis)
+  notesCiphertext String?
+  notesIv         String?
+  notesAuthTag    String?
+
+  createdById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("CredentialCreatedBy", fields: [createdById], references: [id])
+
+  @@index([projectId])
+  @@map("credentials")
+}
+
+// ---------------------------------------------------------------------------
+// Notas / Regras da aplicacao (knowledge base)
+// ---------------------------------------------------------------------------
+
+model NoteFolder {
+  id        String  @id @default(cuid())
+  projectId String
+  name      String
+  parentId  String?
+
+  project  Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent   NoteFolder?  @relation("NoteFolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children NoteFolder[] @relation("NoteFolderChildren")
+  notes    Note[]
+
+  createdAt DateTime @default(now())
+
+  @@map("note_folders")
+}
+
+model Note {
+  id        String  @id @default(cuid())
+  projectId String
+  folderId  String?
+  title     String
+  content   String  @db.Text // markdown
+  isPinned  Boolean @default(false)
+
+  createdById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folder    NoteFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdBy User          @relation("NoteCreatedBy", fields: [createdById], references: [id])
+  versions  NoteVersion[]
+
+  @@index([projectId])
+  @@map("notes")
+}
+
+model NoteVersion {
+  id      String @id @default(cuid())
+  noteId  String
+  title   String
+  content String @db.Text
+
+  editedById String
+
+  createdAt DateTime @default(now())
+
+  note     Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  editedBy User @relation(fields: [editedById], references: [id])
+
+  @@index([noteId])
+  @@map("note_versions")
+}
+
+// ---------------------------------------------------------------------------
+// Integracao GitHub
+// ---------------------------------------------------------------------------
+
+model GithubRepo {
+  id        String @id @default(cuid())
+  projectId String
+  owner     String
+  name      String
+  fullName  String // owner/name
+
+  connectedById String
+
+  createdAt DateTime @default(now())
+
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connectedBy User    @relation("GithubRepoConnectedBy", fields: [connectedById], references: [id])
+
+  @@unique([projectId, fullName])
+  @@map("github_repos")
+}
+
+// ---------------------------------------------------------------------------
+// Notificacoes e atividade
+// ---------------------------------------------------------------------------
+
+enum NotificationType {
+  BUG_ATRIBUIDO
+  TAREFA_ATRIBUIDA
+  COMENTARIO
+  DEADLINE_PROXIMO
+  MEMBRO_ADICIONADO
+  SISTEMA
+}
+
+model Notification {
+  id     String           @id @default(cuid())
+  userId String
+  type   NotificationType
+  title  String
+  body   String?
+  link   String?
+  isRead Boolean          @default(false)
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id         String  @id @default(cuid())
+  projectId  String
+  userId     String
+  action     String // ex: "bug.criado", "tarefa.status_alterado"
+  entityType String // "bug" | "task" | "note" | "credential" | "project"
+  entityId   String
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([projectId, createdAt])
+  @@map("activity_logs")
+}
