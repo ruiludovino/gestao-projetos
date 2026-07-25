@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { put, del } from "@vercel/blob";
-import { BugStatus, Priority, ProjectRole } from "@prisma/client";
+import { BugStatus, NotificationType, Priority, ProjectRole } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -179,6 +179,17 @@ export async function updateBugAssigneeAction(bugId: string, assigneeId: string 
     entityId: bugId,
     metadata: { assigneeId },
   });
+
+  if (assigneeId && assigneeId !== userId) {
+    await prisma.notification.create({
+      data: {
+        userId: assigneeId,
+        type: NotificationType.BUG_ATRIBUIDO,
+        title: `Foste atribuído ao bug "${bug.title}"`,
+        link: `/projetos/${bug.projectId}/bugs/${bugId}`,
+      },
+    });
+  }
 
   revalidatePath(`/projetos/${bug.projectId}/bugs/${bugId}`);
   revalidatePath(`/projetos/${bug.projectId}/bugs`);

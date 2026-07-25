@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { Priority, ProjectRole, TaskStatus } from "@prisma/client";
+import { NotificationType, Priority, ProjectRole, TaskStatus } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -187,6 +187,17 @@ export async function updateTaskAssigneeAction(taskId: string, assigneeId: strin
     entityId: taskId,
     metadata: { assigneeId },
   });
+
+  if (assigneeId && assigneeId !== userId) {
+    await prisma.notification.create({
+      data: {
+        userId: assigneeId,
+        type: NotificationType.TAREFA_ATRIBUIDA,
+        title: `Foste atribuído à tarefa "${task.title}"`,
+        link: `/projetos/${task.projectId}/tarefas/${taskId}`,
+      },
+    });
+  }
 
   revalidatePath(`/projetos/${task.projectId}/tarefas`);
   revalidatePath(`/projetos/${task.projectId}/tarefas/lista`);
