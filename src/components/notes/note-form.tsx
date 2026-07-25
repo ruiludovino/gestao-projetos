@@ -26,11 +26,13 @@ export function NoteForm({
   projectId,
   folders,
   members,
+  currentUserId,
   defaultFolderId,
 }: {
   projectId: string;
   folders: Folder[];
   members: Member[];
+  currentUserId: string;
   defaultFolderId?: string;
 }) {
   const action = createNoteAction.bind(null, projectId);
@@ -75,6 +77,7 @@ export function NoteForm({
           items={Object.fromEntries(
             members.map((member) => [member.userId, member.user.name ?? member.user.email]),
           )}
+          defaultValue={currentUserId}
         >
           <SelectTrigger className="w-full" id="assigneeId">
             <SelectValue placeholder="Ninguém" />

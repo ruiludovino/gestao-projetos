@@ -115,7 +115,7 @@ export async function createCredentialAction(
       notesCiphertext: notesEnc?.ciphertext ?? null,
       notesIv: notesEnc?.iv ?? null,
       notesAuthTag: notesEnc?.authTag ?? null,
-      assigneeId: assigneeId || null,
+      assigneeId: assigneeId || userId,
       createdById: userId,
     },
   });

@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NoteForm } from "@/components/notes/note-form";
@@ -11,6 +12,8 @@ export default async function NewNotePage({
 }) {
   const { projectId } = await params;
   const { folder } = await searchParams;
+  const session = await auth();
+  const userId = session!.user.id;
 
   const [folders, members] = await Promise.all([
     prisma.noteFolder.findMany({
@@ -35,6 +38,7 @@ export default async function NewNotePage({
             projectId={projectId}
             folders={folders}
             members={members}
+            currentUserId={userId}
             defaultFolderId={folder}
           />
         </CardContent>

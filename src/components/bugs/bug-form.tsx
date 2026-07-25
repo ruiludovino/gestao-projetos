@@ -27,9 +27,10 @@ type BugFormProps = {
   projectId: string;
   members: Member[];
   labels: LabelOption[];
+  currentUserId: string;
 };
 
-export function BugForm({ projectId, members, labels }: BugFormProps) {
+export function BugForm({ projectId, members, labels, currentUserId }: BugFormProps) {
   const action = createBugAction.bind(null, projectId);
   const [state, formAction, isPending] = useActionState(action, initialState);
   const fieldErrors = state.fieldErrors ?? {};
@@ -73,6 +74,7 @@ export function BugForm({ projectId, members, labels }: BugFormProps) {
             items={Object.fromEntries(
               members.map((member) => [member.userId, member.user.name ?? member.user.email]),
             )}
+            defaultValue={currentUserId}
           >
             <SelectTrigger className="w-full" id="assigneeId">
               <SelectValue placeholder="Ninguém" />

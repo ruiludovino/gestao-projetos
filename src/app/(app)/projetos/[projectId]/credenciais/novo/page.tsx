@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CredentialForm } from "@/components/credentials/credential-form";
@@ -8,6 +9,8 @@ export default async function NewCredentialPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
+  const session = await auth();
+  const userId = session!.user.id;
 
   const members = await prisma.projectMember.findMany({
     where: { projectId },
@@ -22,7 +25,7 @@ export default async function NewCredentialPage({
           <CardTitle>Detalhes</CardTitle>
         </CardHeader>
         <CardContent>
-          <CredentialForm projectId={projectId} members={members} />
+          <CredentialForm projectId={projectId} members={members} currentUserId={userId} />
         </CardContent>
       </Card>
     </div>

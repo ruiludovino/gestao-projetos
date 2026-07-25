@@ -136,7 +136,7 @@ export async function createNoteAction(
       title: parsed.data.title,
       content: parsed.data.content || "",
       folderId: parsed.data.folderId || null,
-      assigneeId: parsed.data.assigneeId || null,
+      assigneeId: parsed.data.assigneeId || userId,
       createdById: userId,
     },
   });

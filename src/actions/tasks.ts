@@ -118,7 +118,7 @@ export async function createTaskAction(
         title,
         description: description || "",
         priority,
-        assigneeId: parsed.data.assigneeId || null,
+        assigneeId: parsed.data.assigneeId || userId,
         deadline: parsed.data.deadline ? new Date(parsed.data.deadline) : null,
         position: (maxPosition._max.position ?? -1) + 1,
       },

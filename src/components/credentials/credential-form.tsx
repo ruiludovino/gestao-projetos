@@ -22,9 +22,11 @@ type Member = { userId: string; user: { name: string | null; email: string | nul
 export function CredentialForm({
   projectId,
   members,
+  currentUserId,
 }: {
   projectId: string;
   members: Member[];
+  currentUserId: string;
 }) {
   const action = createCredentialAction.bind(null, projectId);
   const [state, formAction, isPending] = useActionState(action, initialState);
@@ -71,6 +73,7 @@ export function CredentialForm({
           items={Object.fromEntries(
             members.map((member) => [member.userId, member.user.name ?? member.user.email]),
           )}
+          defaultValue={currentUserId}
         >
           <SelectTrigger className="w-full" id="assigneeId">
             <SelectValue placeholder="Ninguém" />

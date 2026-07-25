@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BugForm } from "@/components/bugs/bug-form";
@@ -8,6 +9,8 @@ export default async function NewBugPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
+  const session = await auth();
+  const userId = session!.user.id;
 
   const [members, labels] = await Promise.all([
     prisma.projectMember.findMany({
@@ -25,7 +28,7 @@ export default async function NewBugPage({
           <CardTitle>Detalhes</CardTitle>
         </CardHeader>
         <CardContent>
-          <BugForm projectId={projectId} members={members} labels={labels} />
+          <BugForm projectId={projectId} members={members} labels={labels} currentUserId={userId} />
         </CardContent>
       </Card>
     </div>

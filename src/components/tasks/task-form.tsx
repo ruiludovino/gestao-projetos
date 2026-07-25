@@ -21,7 +21,15 @@ const initialState: TaskFormState = {};
 
 type Member = { userId: string; user: { name: string | null; email: string | null } };
 
-export function TaskForm({ projectId, members }: { projectId: string; members: Member[] }) {
+export function TaskForm({
+  projectId,
+  members,
+  currentUserId,
+}: {
+  projectId: string;
+  members: Member[];
+  currentUserId: string;
+}) {
   const action = createTaskAction.bind(null, projectId);
   const [state, formAction, isPending] = useActionState(action, initialState);
   const fieldErrors = state.fieldErrors ?? {};
@@ -65,6 +73,7 @@ export function TaskForm({ projectId, members }: { projectId: string; members: M
             items={Object.fromEntries(
               members.map((member) => [member.userId, member.user.name ?? member.user.email]),
             )}
+            defaultValue={currentUserId}
           >
             <SelectTrigger className="w-full" id="assigneeId">
               <SelectValue placeholder="Ninguém" />

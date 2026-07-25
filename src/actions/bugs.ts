@@ -116,7 +116,7 @@ export async function createBugAction(
         description: description || "",
         priority,
         reporterId: userId,
-        assigneeId: parsed.data.assigneeId || null,
+        assigneeId: parsed.data.assigneeId || userId,
         labels: labelIds.length
           ? { create: labelIds.map((labelId) => ({ labelId })) }
           : undefined,
