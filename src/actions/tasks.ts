@@ -119,6 +119,7 @@ export async function createTaskAction(
         description: description || "",
         priority,
         assigneeId: parsed.data.assigneeId || userId,
+        createdById: userId,
         deadline: parsed.data.deadline ? new Date(parsed.data.deadline) : null,
         position: (maxPosition._max.position ?? -1) + 1,
       },
@@ -314,7 +315,7 @@ export async function createSubtaskAction(
   _prevState: TaskFormState,
   formData: FormData,
 ): Promise<TaskFormState> {
-  const { task, membership } = await requireTaskAccess(parentTaskId);
+  const { task, userId, membership } = await requireTaskAccess(parentTaskId);
   if (!canEditContent(membership.role)) {
     return { error: "Não tens permissão para editar esta tarefa." };
   }
@@ -336,6 +337,7 @@ export async function createSubtaskAction(
       title: parsed.data.title,
       parentTaskId,
       priority: task.priority,
+      createdById: userId,
     },
   });
 

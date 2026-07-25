@@ -10,6 +10,7 @@ import { canEditContent } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { NotesSearch } from "@/components/notes/notes-search";
 import { CreateFolderPopover } from "@/components/notes/create-folder-popover";
+import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { cn } from "@/lib/utils";
 
 function buildFolderDepths(folders: { id: string; parentId: string | null }[]) {
@@ -30,20 +31,25 @@ export default async function NotesPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ q?: string; folder?: string }>;
+  searchParams: Promise<{ q?: string; folder?: string; responsavel?: string }>;
 }) {
   const { projectId } = await params;
-  const { q, folder } = await searchParams;
+  const { q, folder, responsavel } = await searchParams;
   const session = await auth();
   const userId = session!.user.id;
 
-  const [membership, folders, notes] = await Promise.all([
+  const [membership, members, folders, notes] = await Promise.all([
     getMembership(projectId, userId),
+    prisma.projectMember.findMany({
+      where: { projectId },
+      include: { user: { select: { name: true, email: true } } },
+    }),
     prisma.noteFolder.findMany({ where: { projectId }, orderBy: { name: "asc" } }),
     prisma.note.findMany({
       where: {
         projectId,
         ...(folder ? { folderId: folder } : {}),
+        ...(responsavel ? { assigneeId: responsavel } : {}),
         ...(q
           ? {
               OR: [
@@ -101,6 +107,7 @@ export default async function NotesPage({
           <h1 className="text-xl font-semibold tracking-tight">Notas</h1>
           <div className="flex items-center gap-2">
             <NotesSearch />
+            <AssigneeFilter members={members} />
             {canEdit && (
               <Button
                 render={
@@ -129,6 +136,7 @@ export default async function NotesPage({
                     <span className="font-medium">{note.title}</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>Criado por: {note.createdBy.name ?? note.createdBy.email}</span>
                     {note.assignee && (
                       <span>Responsável: {note.assignee.name ?? note.assignee.email}</span>
                     )}

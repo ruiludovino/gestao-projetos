@@ -6,14 +6,25 @@ import { prisma } from "@/lib/prisma";
 import { getMembership } from "@/lib/project-data";
 import { canViewCredentials } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
-import { CredentialCard } from "@/components/credentials/credential-card";
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { CredentialRow } from "@/components/credentials/credential-row";
+import { AssigneeFilter } from "@/components/shared/assignee-filter";
 
 export default async function CredentialsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ responsavel?: string }>;
 }) {
   const { projectId } = await params;
+  const { responsavel } = await searchParams;
   const session = await auth();
   const userId = session!.user.id;
 
@@ -29,9 +40,12 @@ export default async function CredentialsPage({
 
   const [credentials, members] = await Promise.all([
     prisma.credential.findMany({
-      where: { projectId },
+      where: { projectId, ...(responsavel ? { assigneeId: responsavel } : {}) },
       orderBy: { serviceName: "asc" },
-      include: { assignee: { select: { name: true, email: true } } },
+      include: {
+        assignee: { select: { name: true, email: true } },
+        createdBy: { select: { name: true, email: true } },
+      },
     }),
     prisma.projectMember.findMany({
       where: { projectId },
@@ -41,26 +55,41 @@ export default async function CredentialsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold tracking-tight">Credenciais / Plataformas</h1>
-        <Button
-          render={
-            <Link href={`/projetos/${projectId}/credenciais/novo`}>
-              <Plus className="size-4" />
-              Nova credencial
-            </Link>
-          }
-        />
+        <div className="flex items-center gap-2">
+          <AssigneeFilter members={members} />
+          <Button
+            render={
+              <Link href={`/projetos/${projectId}/credenciais/novo`}>
+                <Plus className="size-4" />
+                Nova credencial
+              </Link>
+            }
+          />
+        </div>
       </div>
 
       {credentials.length === 0 ? (
         <p className="text-sm text-muted-foreground">Ainda não há credenciais guardadas.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {credentials.map((credential) => (
-            <CredentialCard key={credential.id} credential={credential} members={members} />
-          ))}
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Serviço</TableHead>
+              <TableHead>Username</TableHead>
+              <TableHead>Password</TableHead>
+              <TableHead>Responsável</TableHead>
+              <TableHead>Criado por</TableHead>
+              <TableHead className="w-20">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {credentials.map((credential) => (
+              <CredentialRow key={credential.id} credential={credential} members={members} />
+            ))}
+          </TableBody>
+        </Table>
       )}
     </div>
   );

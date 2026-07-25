@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Copy, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { revealCredentialAction, updateCredentialAction } from "@/actions/credentials";
+import { copyToClipboard } from "@/components/credentials/credential-row";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -47,6 +48,8 @@ export function EditCredentialDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState("");
+  const [currentPassword, setCurrentPassword] = useState<string | null>(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -55,10 +58,14 @@ export function EditCredentialDialog({
     setOpen(next);
     setError(null);
     if (next) {
+      setPasswordVisible(false);
       setLoadingNotes(true);
       revealCredentialAction(credential.id)
-        .then((result) => setNotes(result.notes ?? ""))
-        .catch(() => toast.error("Erro ao carregar notas existentes."))
+        .then((result) => {
+          setNotes(result.notes ?? "");
+          setCurrentPassword(result.password);
+        })
+        .catch(() => toast.error("Erro ao carregar dados existentes."))
         .finally(() => setLoadingNotes(false));
     }
   }
@@ -109,7 +116,57 @@ export function EditCredentialDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
-            <Input id="username" name="username" defaultValue={credential.username ?? ""} />
+            <div className="flex items-center gap-1">
+              <Input
+                id="username"
+                name="username"
+                defaultValue={credential.username ?? ""}
+                className="flex-1"
+              />
+              {credential.username && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => copyToClipboard(credential.username!, "Username")}
+                  aria-label="Copiar username"
+                >
+                  <Copy className="size-3.5" />
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Password atual</Label>
+            <div className="flex items-center gap-1">
+              <span className="flex-1 rounded-md border px-3 py-2 font-mono text-sm">
+                {loadingNotes
+                  ? "A carregar..."
+                  : passwordVisible
+                    ? (currentPassword ?? "")
+                    : "••••••••••"}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled={loadingNotes}
+                onClick={() => setPasswordVisible((v) => !v)}
+                aria-label={passwordVisible ? "Esconder password" : "Mostrar password"}
+              >
+                {passwordVisible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled={loadingNotes}
+                onClick={() => currentPassword && copyToClipboard(currentPassword, "Password")}
+                aria-label="Copiar password"
+              >
+                <Copy className="size-3.5" />
+              </Button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Nova password (opcional)</Label>

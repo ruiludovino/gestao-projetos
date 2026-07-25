@@ -18,7 +18,7 @@ export function ProjectNav({ projectId, showCredentials, showSettings }: Project
   const items = [
     { href: base, label: "Dashboard", exact: true },
     { href: `${base}/bugs`, label: "Bugs" },
-    { href: `${base}/tarefas`, label: "Tarefas" },
+    { href: `${base}/tarefas/lista`, label: "Tarefas", matchPrefix: `${base}/tarefas` },
     ...(showCredentials
       ? [{ href: `${base}/credenciais`, label: "Credenciais / Plataformas" }]
       : []),
@@ -30,7 +30,9 @@ export function ProjectNav({ projectId, showCredentials, showSettings }: Project
   return (
     <nav className="flex gap-1 border-b px-6">
       {items.map((item) => {
-        const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+        const isActive = item.exact
+          ? pathname === item.href
+          : pathname.startsWith(item.matchPrefix ?? item.href);
         return (
           <Link
             key={item.href}

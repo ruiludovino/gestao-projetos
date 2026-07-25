@@ -17,23 +17,32 @@ import {
 } from "@/components/ui/table";
 import { PriorityBadge } from "@/components/shared/priority-badge";
 import { BugStatusBadge } from "@/components/shared/bug-status-badge";
+import { AssigneeFilter } from "@/components/shared/assignee-filter";
 
 export default async function BugsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ responsavel?: string }>;
 }) {
   const { projectId } = await params;
+  const { responsavel } = await searchParams;
   const session = await auth();
   const userId = session!.user.id;
 
-  const [membership, bugs] = await Promise.all([
+  const [membership, members, bugs] = await Promise.all([
     getMembership(projectId, userId),
-    prisma.bug.findMany({
+    prisma.projectMember.findMany({
       where: { projectId },
+      include: { user: { select: { name: true, email: true } } },
+    }),
+    prisma.bug.findMany({
+      where: { projectId, ...(responsavel ? { assigneeId: responsavel } : {}) },
       orderBy: { createdAt: "desc" },
       include: {
         assignee: { select: { name: true, email: true, image: true } },
+        reporter: { select: { name: true, email: true, image: true } },
         labels: { include: { label: true } },
       },
     }),
@@ -41,18 +50,21 @@ export default async function BugsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold tracking-tight">Bugs</h1>
-        {canEditContent(membership.role) && (
-          <Button
-            render={
-              <Link href={`/projetos/${projectId}/bugs/novo`}>
-                <Plus className="size-4" />
-                Novo bug
-              </Link>
-            }
-          />
-        )}
+        <div className="flex items-center gap-2">
+          <AssigneeFilter members={members} />
+          {canEditContent(membership.role) && (
+            <Button
+              render={
+                <Link href={`/projetos/${projectId}/bugs/novo`}>
+                  <Plus className="size-4" />
+                  Novo bug
+                </Link>
+              }
+            />
+          )}
+        </div>
       </div>
 
       {bugs.length === 0 ? (
@@ -66,11 +78,13 @@ export default async function BugsPage({
               <TableHead>Prioridade</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Atribuído</TableHead>
+              <TableHead>Criado por</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {bugs.map((bug) => {
               const assigneeLabel = bug.assignee?.name ?? bug.assignee?.email;
+              const reporterLabel = bug.reporter?.name ?? bug.reporter?.email;
               return (
                 <TableRow key={bug.id}>
                   <TableCell className="font-mono text-xs text-muted-foreground">
@@ -117,6 +131,15 @@ export default async function BugsPage({
                     ) : (
                       <span className="text-sm text-muted-foreground">—</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="size-6">
+                        <AvatarImage src={bug.reporter.image ?? undefined} alt={reporterLabel ?? ""} />
+                        <AvatarFallback>{reporterLabel?.charAt(0).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{reporterLabel}</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
