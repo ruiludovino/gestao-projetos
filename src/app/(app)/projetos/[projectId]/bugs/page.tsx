@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { BugStatus } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -18,16 +19,20 @@ import {
 import { PriorityBadge } from "@/components/shared/priority-badge";
 import { BugStatusBadge } from "@/components/shared/bug-status-badge";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
+import { ResolveBugButton } from "@/components/bugs/resolve-bug-button";
+
+const RESOLVED_STATUSES: BugStatus[] = [BugStatus.RESOLVIDO, BugStatus.FECHADO];
 
 export default async function BugsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ responsavel?: string }>;
+  searchParams: Promise<{ responsavel?: string; estado?: string }>;
 }) {
   const { projectId } = await params;
-  const { responsavel } = await searchParams;
+  const { responsavel, estado } = await searchParams;
+  const isHistory = estado === "historico";
   const session = await auth();
   const userId = session!.user.id;
 
@@ -38,7 +43,11 @@ export default async function BugsPage({
       include: { user: { select: { name: true, email: true } } },
     }),
     prisma.bug.findMany({
-      where: { projectId, ...(responsavel ? { assigneeId: responsavel } : {}) },
+      where: {
+        projectId,
+        status: isHistory ? { in: RESOLVED_STATUSES } : { notIn: RESOLVED_STATUSES },
+        ...(responsavel ? { assigneeId: responsavel } : {}),
+      },
       orderBy: { createdAt: "desc" },
       include: {
         assignee: { select: { name: true, email: true, image: true } },
@@ -48,13 +57,24 @@ export default async function BugsPage({
     }),
   ]);
 
+  const toggleParams = new URLSearchParams();
+  if (!isHistory) toggleParams.set("estado", "historico");
+  if (responsavel) toggleParams.set("responsavel", responsavel);
+  const toggleQuery = toggleParams.toString();
+  const toggleHref = `/projetos/${projectId}/bugs${toggleQuery ? `?${toggleQuery}` : ""}`;
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold tracking-tight">Bugs</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-semibold tracking-tight">Bugs</h1>
+          <Link href={toggleHref} className="text-sm text-muted-foreground hover:underline">
+            {isHistory ? "Ver ativos" : "Ver histórico"}
+          </Link>
+        </div>
         <div className="flex items-center gap-2">
           <AssigneeFilter members={members} />
-          {canEditContent(membership.role) && (
+          {canEditContent(membership.role) && !isHistory && (
             <Button
               render={
                 <Link href={`/projetos/${projectId}/bugs/novo`}>
@@ -68,7 +88,9 @@ export default async function BugsPage({
       </div>
 
       {bugs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Ainda não há bugs reportados.</p>
+        <p className="text-sm text-muted-foreground">
+          {isHistory ? "Ainda não há bugs resolvidos." : "Ainda não há bugs reportados."}
+        </p>
       ) : (
         <Table>
           <TableHeader>
@@ -79,6 +101,7 @@ export default async function BugsPage({
               <TableHead>Estado</TableHead>
               <TableHead>Atribuído</TableHead>
               <TableHead>Criado por</TableHead>
+              {canEditContent(membership.role) && <TableHead className="w-32">Ações</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -141,6 +164,11 @@ export default async function BugsPage({
                       <span className="text-sm">{reporterLabel}</span>
                     </div>
                   </TableCell>
+                  {canEditContent(membership.role) && (
+                    <TableCell>
+                      <ResolveBugButton bugId={bug.id} isHistory={isHistory} />
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}

@@ -352,6 +352,13 @@ model Attachment {
 // Credenciais (Cofre Seguro) - passwords sempre encriptadas com AES-256-GCM
 // ---------------------------------------------------------------------------
 
+enum BillingCycle {
+  MENSAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+}
+
 model Credential {
   id          String  @id @default(cuid())
   projectId   String
@@ -368,6 +375,9 @@ model Credential {
   notesCiphertext String?
   notesIv         String?
   notesAuthTag    String?
+
+  cost         Float?
+  billingCycle BillingCycle?
 
   createdById String
   assigneeId  String?
@@ -407,9 +417,10 @@ model Note {
   id        String  @id @default(cuid())
   projectId String
   folderId  String?
-  title     String
-  content   String  @db.Text // markdown
-  isPinned  Boolean @default(false)
+  title      String
+  content    String  @db.Text // markdown
+  isPinned   Boolean @default(false)
+  isResolved Boolean @default(false)
 
   createdById String
   assigneeId  String?

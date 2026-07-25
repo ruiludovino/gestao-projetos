@@ -226,6 +226,26 @@ export async function togglePinNoteAction(noteId: string) {
   revalidatePath(`/projetos/${note.projectId}/notas/${noteId}`);
 }
 
+export async function toggleNoteResolvedAction(noteId: string) {
+  const { note, userId, membership } = await requireNoteAccess(noteId);
+  if (!canEditContent(membership.role)) {
+    throw new Error("Não tens permissão para editar esta nota.");
+  }
+
+  await prisma.note.update({ where: { id: noteId }, data: { isResolved: !note.isResolved } });
+
+  await logActivity({
+    projectId: note.projectId,
+    userId,
+    action: note.isResolved ? "nota.reaberta" : "nota.resolvida",
+    entityType: "note",
+    entityId: noteId,
+  });
+
+  revalidatePath(`/projetos/${note.projectId}/notas`);
+  revalidatePath(`/projetos/${note.projectId}/notas/${noteId}`);
+}
+
 export async function updateNoteAssigneeAction(noteId: string, assigneeId: string | null) {
   const { note, userId, membership } = await requireNoteAccess(noteId);
   if (!canEditContent(membership.role)) {

@@ -2,7 +2,10 @@
 
 import { useActionState } from "react";
 
+import { BillingCycle } from "@prisma/client";
+
 import { createCredentialAction, type CredentialFormState } from "@/actions/credentials";
+import { BILLING_CYCLE_LABELS } from "@/components/credentials/billing-cycle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,6 +67,29 @@ export function CredentialForm({
       <div className="space-y-2">
         <Label htmlFor="notes">Notas (opcional)</Label>
         <Textarea id="notes" name="notes" rows={3} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="cost">Custo (opcional)</Label>
+          <Input id="cost" name="cost" type="number" step="0.01" min="0" placeholder="0.00" />
+          {fieldErrors.cost && <p className="text-sm text-destructive">{fieldErrors.cost[0]}</p>}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="billingCycle">Periodicidade</Label>
+          <Select name="billingCycle" items={BILLING_CYCLE_LABELS}>
+            <SelectTrigger className="w-full" id="billingCycle">
+              <SelectValue placeholder="Selecionar" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.values(BillingCycle).map((cycle) => (
+                <SelectItem key={cycle} value={cycle}>
+                  {BILLING_CYCLE_LABELS[cycle]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="space-y-2">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
+import { TaskStatus } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -20,16 +21,18 @@ import {
 import { PriorityBadge } from "@/components/shared/priority-badge";
 import { TaskStatusBadge } from "@/components/shared/task-status-badge";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
+import { ResolveTaskButton } from "@/components/tasks/resolve-task-button";
 
 export default async function TasksListPage({
   params,
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ responsavel?: string }>;
+  searchParams: Promise<{ responsavel?: string; estado?: string }>;
 }) {
   const { projectId } = await params;
-  const { responsavel } = await searchParams;
+  const { responsavel, estado } = await searchParams;
+  const isHistory = estado === "historico";
   const session = await auth();
   const userId = session!.user.id;
 
@@ -40,7 +43,12 @@ export default async function TasksListPage({
       include: { user: { select: { name: true, email: true } } },
     }),
     prisma.task.findMany({
-      where: { projectId, parentTaskId: null, ...(responsavel ? { assigneeId: responsavel } : {}) },
+      where: {
+        projectId,
+        parentTaskId: null,
+        status: isHistory ? TaskStatus.DONE : { not: TaskStatus.DONE },
+        ...(responsavel ? { assigneeId: responsavel } : {}),
+      },
       orderBy: [{ status: "asc" }, { position: "asc" }],
       include: {
         assignee: { select: { name: true, email: true, image: true } },
@@ -48,6 +56,12 @@ export default async function TasksListPage({
       },
     }),
   ]);
+
+  const toggleParams = new URLSearchParams();
+  if (!isHistory) toggleParams.set("estado", "historico");
+  if (responsavel) toggleParams.set("responsavel", responsavel);
+  const toggleQuery = toggleParams.toString();
+  const toggleHref = `/projetos/${projectId}/tarefas/lista${toggleQuery ? `?${toggleQuery}` : ""}`;
 
   return (
     <div>
@@ -60,10 +74,13 @@ export default async function TasksListPage({
           >
             Ver como kanban
           </Link>
+          <Link href={toggleHref} className="text-sm text-muted-foreground hover:underline">
+            {isHistory ? "Ver ativas" : "Ver histórico"}
+          </Link>
         </div>
         <div className="flex items-center gap-2">
           <AssigneeFilter members={members} />
-          {canEditContent(membership.role) && (
+          {canEditContent(membership.role) && !isHistory && (
             <Button
               render={
                 <Link href={`/projetos/${projectId}/tarefas/novo`}>
@@ -77,7 +94,9 @@ export default async function TasksListPage({
       </div>
 
       {tasks.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Ainda não há tarefas.</p>
+        <p className="text-sm text-muted-foreground">
+          {isHistory ? "Ainda não há tarefas concluídas." : "Ainda não há tarefas."}
+        </p>
       ) : (
         <Table>
           <TableHeader>
@@ -89,6 +108,7 @@ export default async function TasksListPage({
               <TableHead>Deadline</TableHead>
               <TableHead>Atribuído</TableHead>
               <TableHead>Criado por</TableHead>
+              {canEditContent(membership.role) && <TableHead className="w-32">Ações</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -143,6 +163,11 @@ export default async function TasksListPage({
                       <span className="text-sm text-muted-foreground">—</span>
                     )}
                   </TableCell>
+                  {canEditContent(membership.role) && (
+                    <TableCell>
+                      <ResolveTaskButton taskId={task.id} isHistory={isHistory} />
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}

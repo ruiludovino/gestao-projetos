@@ -3,8 +3,10 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Copy, Eye, EyeOff } from "lucide-react";
+import { BillingCycle } from "@prisma/client";
 
 import { revealCredentialAction } from "@/actions/credentials";
+import { formatCredentialCost } from "@/components/credentials/billing-cycle";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { EditCredentialDialog } from "@/components/credentials/edit-credential-dialog";
@@ -20,6 +22,8 @@ type Credential = {
   assigneeId: string | null;
   assignee: { name: string | null; email: string | null } | null;
   createdBy: { name: string | null; email: string | null };
+  cost: number | null;
+  billingCycle: BillingCycle | null;
 };
 
 export async function copyToClipboard(value: string, label: string) {
@@ -127,6 +131,11 @@ export function CredentialRow({
             <Copy className="size-3.5" />
           </Button>
         </div>
+      </TableCell>
+      <TableCell>
+        <span className="text-sm">
+          {formatCredentialCost(credential.cost, credential.billingCycle) ?? "—"}
+        </span>
       </TableCell>
       <TableCell>
         <span className="text-sm">

@@ -14,9 +14,15 @@ import { sendAssignmentEmail } from "@/lib/email";
 import { createCredentialSchema, updateCredentialSchema } from "@/lib/validations/credential";
 
 const NO_ASSIGNEE = "__unassigned__";
+const NO_BILLING_CYCLE = "__none__";
 
 function normalizeAssigneeId(value: FormDataEntryValue | null): string {
   if (!value || value === NO_ASSIGNEE) return "";
+  return String(value);
+}
+
+function normalizeBillingCycle(value: FormDataEntryValue | null): string {
+  if (!value || value === NO_BILLING_CYCLE) return "";
   return String(value);
 }
 
@@ -94,12 +100,15 @@ export async function createCredentialAction(
     password: formData.get("password"),
     notes: formData.get("notes"),
     assigneeId: normalizeAssigneeId(formData.get("assigneeId")),
+    cost: formData.get("cost"),
+    billingCycle: normalizeBillingCycle(formData.get("billingCycle")),
   });
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const { serviceName, url, username, password, notes, assigneeId } = parsed.data;
+  const { serviceName, url, username, password, notes, assigneeId, cost, billingCycle } =
+    parsed.data;
   const passwordEnc = encrypt(password);
   const notesEnc = notes ? encrypt(notes) : null;
 
@@ -116,6 +125,8 @@ export async function createCredentialAction(
       notesIv: notesEnc?.iv ?? null,
       notesAuthTag: notesEnc?.authTag ?? null,
       assigneeId: assigneeId || userId,
+      cost: cost ? Number(cost) : null,
+      billingCycle: billingCycle || null,
       createdById: userId,
     },
   });
@@ -157,12 +168,15 @@ export async function updateCredentialAction(
     password: formData.get("password"),
     notes: formData.get("notes"),
     assigneeId: normalizeAssigneeId(formData.get("assigneeId")),
+    cost: formData.get("cost"),
+    billingCycle: normalizeBillingCycle(formData.get("billingCycle")),
   });
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const { serviceName, url, username, password, notes, assigneeId } = parsed.data;
+  const { serviceName, url, username, password, notes, assigneeId, cost, billingCycle } =
+    parsed.data;
   const notesEnc = notes ? encrypt(notes) : null;
   const nextAssigneeId = assigneeId || null;
 
@@ -180,6 +194,8 @@ export async function updateCredentialAction(
       notesIv: notesEnc?.iv ?? null,
       notesAuthTag: notesEnc?.authTag ?? null,
       assigneeId: nextAssigneeId,
+      cost: cost ? Number(cost) : null,
+      billingCycle: billingCycle || null,
       ...(password
         ? (() => {
             const enc = encrypt(password);

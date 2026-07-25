@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { NotesSearch } from "@/components/notes/notes-search";
 import { CreateFolderPopover } from "@/components/notes/create-folder-popover";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
+import { ResolveNoteButton } from "@/components/notes/resolve-note-button";
 import { cn } from "@/lib/utils";
 
 function buildFolderDepths(folders: { id: string; parentId: string | null }[]) {
@@ -31,10 +32,11 @@ export default async function NotesPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ q?: string; folder?: string; responsavel?: string }>;
+  searchParams: Promise<{ q?: string; folder?: string; responsavel?: string; estado?: string }>;
 }) {
   const { projectId } = await params;
-  const { q, folder, responsavel } = await searchParams;
+  const { q, folder, responsavel, estado } = await searchParams;
+  const isHistory = estado === "historico";
   const session = await auth();
   const userId = session!.user.id;
 
@@ -48,6 +50,7 @@ export default async function NotesPage({
     prisma.note.findMany({
       where: {
         projectId,
+        isResolved: isHistory,
         ...(folder ? { folderId: folder } : {}),
         ...(responsavel ? { assigneeId: responsavel } : {}),
         ...(q
@@ -69,6 +72,13 @@ export default async function NotesPage({
 
   const canEdit = canEditContent(membership.role);
   const depths = buildFolderDepths(folders);
+
+  const toggleParams = new URLSearchParams();
+  if (!isHistory) toggleParams.set("estado", "historico");
+  if (responsavel) toggleParams.set("responsavel", responsavel);
+  if (folder) toggleParams.set("folder", folder);
+  const toggleQuery = toggleParams.toString();
+  const toggleHref = `/projetos/${projectId}/notas${toggleQuery ? `?${toggleQuery}` : ""}`;
 
   return (
     <div className="flex gap-8">
@@ -104,11 +114,16 @@ export default async function NotesPage({
 
       <div className="flex-1 space-y-6">
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold tracking-tight">Notas</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold tracking-tight">Notas</h1>
+            <Link href={toggleHref} className="text-sm text-muted-foreground hover:underline">
+              {isHistory ? "Ver ativas" : "Ver histórico"}
+            </Link>
+          </div>
           <div className="flex items-center gap-2">
             <NotesSearch />
             <AssigneeFilter members={members} />
-            {canEdit && (
+            {canEdit && !isHistory && (
               <Button
                 render={
                   <Link href={`/projetos/${projectId}/notas/nova${folder ? `?folder=${folder}` : ""}`}>
@@ -122,7 +137,9 @@ export default async function NotesPage({
         </div>
 
         {notes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Ainda não há notas.</p>
+          <p className="text-sm text-muted-foreground">
+            {isHistory ? "Ainda não há notas resolvidas." : "Ainda não há notas."}
+          </p>
         ) : (
           <ul className="space-y-2">
             {notes.map((note) => (
@@ -144,6 +161,9 @@ export default async function NotesPage({
                       Atualizada{" "}
                       {formatDistanceToNow(note.updatedAt, { addSuffix: true, locale: pt })}
                     </span>
+                    {canEdit && (
+                      <ResolveNoteButton noteId={note.id} isResolved={note.isResolved} />
+                    )}
                   </div>
                 </Link>
               </li>

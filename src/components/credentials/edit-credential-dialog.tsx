@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { Pencil, Copy, Eye, EyeOff } from "lucide-react";
+import { BillingCycle } from "@prisma/client";
 import { toast } from "sonner";
 
 import { revealCredentialAction, updateCredentialAction } from "@/actions/credentials";
 import { copyToClipboard } from "@/components/credentials/credential-row";
+import { BILLING_CYCLE_LABELS } from "@/components/credentials/billing-cycle";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +30,7 @@ import {
 } from "@/components/ui/select";
 
 const NO_ASSIGNEE = "__unassigned__";
+const NO_BILLING_CYCLE = "__none__";
 
 type Member = { userId: string; user: { name: string | null; email: string | null } };
 
@@ -37,6 +40,8 @@ type Credential = {
   url: string | null;
   username: string | null;
   assigneeId: string | null;
+  cost: number | null;
+  billingCycle: BillingCycle | null;
 };
 
 export function EditCredentialDialog({
@@ -188,6 +193,43 @@ export function EditCredentialDialog({
               onChange={(event) => setNotes(event.target.value)}
               disabled={loadingNotes}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="cost">Custo (opcional)</Label>
+              <Input
+                id="cost"
+                name="cost"
+                type="number"
+                step="0.01"
+                min="0"
+                defaultValue={credential.cost ?? ""}
+                placeholder="0.00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="billingCycle">Periodicidade</Label>
+              <Select
+                name="billingCycle"
+                items={{
+                  [NO_BILLING_CYCLE]: "Sem periodicidade",
+                  ...BILLING_CYCLE_LABELS,
+                }}
+                defaultValue={credential.billingCycle ?? NO_BILLING_CYCLE}
+              >
+                <SelectTrigger className="w-full" id="billingCycle">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_BILLING_CYCLE}>Sem periodicidade</SelectItem>
+                  {Object.values(BillingCycle).map((cycle) => (
+                    <SelectItem key={cycle} value={cycle}>
+                      {BILLING_CYCLE_LABELS[cycle]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="assigneeId">Responsável</Label>

@@ -79,6 +79,7 @@ export default async function CredentialsPage({
               <TableHead>Serviço</TableHead>
               <TableHead>Username</TableHead>
               <TableHead>Password</TableHead>
+              <TableHead>Custo</TableHead>
               <TableHead>Responsável</TableHead>
               <TableHead>Criado por</TableHead>
               <TableHead className="w-20">Ações</TableHead>
