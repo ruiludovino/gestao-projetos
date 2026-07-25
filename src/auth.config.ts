@@ -13,6 +13,7 @@ const APP_PATH_PREFIXES = [
 export const authConfig = {
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   providers: [],
   callbacks: {

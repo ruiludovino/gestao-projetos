@@ -32,6 +32,7 @@ model User {
 
   projectMemberships ProjectMember[]
   createdProjects    Project[]       @relation("ProjectCreatedBy")
+  sentInvites        ProjectInvite[] @relation("ProjectInviteSentBy")
 
   reportedBugs   Bug[]           @relation("BugReporter")
   assignedBugs   Bug[]           @relation("BugAssignee")
@@ -117,6 +118,7 @@ model Project {
   updatedAt DateTime @updatedAt
 
   members      ProjectMember[]
+  invites      ProjectInvite[]
   bugs         Bug[]
   tasks        Task[]
   credentials  Credential[]
@@ -143,6 +145,24 @@ model ProjectMember {
   @@unique([projectId, userId])
   @@index([userId])
   @@map("project_members")
+}
+
+// Convite pendente: a pessoa ainda nao tem conta. Quando se regista (ou faz
+// login com GitHub) com este email, e adicionada automaticamente ao projeto.
+model ProjectInvite {
+  id          String      @id @default(cuid())
+  projectId   String
+  email       String
+  role        ProjectRole @default(DEVELOPER)
+  invitedById String
+
+  createdAt DateTime @default(now())
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  invitedBy User    @relation("ProjectInviteSentBy", fields: [invitedById], references: [id])
+
+  @@unique([projectId, email])
+  @@map("project_invites")
 }
 
 // ---------------------------------------------------------------------------

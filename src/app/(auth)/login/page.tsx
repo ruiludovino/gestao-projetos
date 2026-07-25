@@ -2,13 +2,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GithubSignInButton } from "@/components/auth/github-signin-button";
 import { LoginForm } from "@/components/auth/login-form";
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Entrar</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {error === "AccessDenied" && (
+          <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            Este email ainda não tem acesso. Pede a um admin de um projeto para
+            te convidar antes de entrares com o GitHub.
+          </p>
+        )}
         <GithubSignInButton />
         <div className="relative">
           <div className="absolute inset-0 flex items-center">

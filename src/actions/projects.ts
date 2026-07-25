@@ -143,11 +143,29 @@ export async function addMemberAction(
   const targetUser = await prisma.user.findUnique({
     where: { email: parsed.data.email },
   });
+
+  // Ainda nao tem conta: cria-se um convite. A pessoa e adicionada
+  // automaticamente ao projeto assim que se registar (ou fizer login com
+  // GitHub) com este email.
   if (!targetUser) {
-    return {
-      error:
-        "Não existe nenhuma conta com este email. A pessoa tem de criar conta primeiro (GitHub ou registo).",
-    };
+    const existingInvite = await prisma.projectInvite.findUnique({
+      where: { projectId_email: { projectId, email: parsed.data.email } },
+    });
+    if (existingInvite) {
+      return { error: "Já existe um convite pendente para este email." };
+    }
+
+    await prisma.projectInvite.create({
+      data: {
+        projectId,
+        email: parsed.data.email,
+        role: parsed.data.role,
+        invitedById: userId,
+      },
+    });
+
+    revalidatePath(`/projetos/${projectId}/definicoes`);
+    return {};
   }
 
   const existing = await prisma.projectMember.findUnique({
@@ -183,6 +201,16 @@ export async function addMemberAction(
 
   revalidatePath(`/projetos/${projectId}/definicoes`);
   return {};
+}
+
+export async function cancelInviteAction(inviteId: string) {
+  const invite = await prisma.projectInvite.findUniqueOrThrow({ where: { id: inviteId } });
+  const userId = await requireUserId();
+  await requireProjectRole(userId, invite.projectId, [ProjectRole.ADMIN]);
+
+  await prisma.projectInvite.delete({ where: { id: inviteId } });
+
+  revalidatePath(`/projetos/${invite.projectId}/definicoes`);
 }
 
 export async function removeMemberAction(projectId: string, targetUserId: string) {

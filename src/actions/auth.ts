@@ -6,6 +6,7 @@ import { AuthError } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/lib/validations/auth";
 import { signIn, signOut } from "@/auth";
+import { consumeInvitesForEmail, isEmailAllowedToRegister } from "@/lib/invites";
 
 export type RegisterState = {
   error?: string;
@@ -34,8 +35,16 @@ export async function registerAction(
     return { error: "Já existe uma conta com este email." };
   }
 
+  if (!(await isEmailAllowedToRegister(email))) {
+    return {
+      error:
+        "Este email não tem convite para criar conta. Pede a um admin de um projeto para te convidar primeiro.",
+    };
+  }
+
   const passwordHash = await bcrypt.hash(password, 12);
-  await prisma.user.create({ data: { name, email, passwordHash } });
+  const user = await prisma.user.create({ data: { name, email, passwordHash } });
+  await consumeInvitesForEmail(user.id, email);
 
   try {
     await signIn("credentials", {

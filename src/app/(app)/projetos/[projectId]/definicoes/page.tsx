@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EditProjectForm } from "@/components/projects/edit-project-form";
 import { AddMemberDialog } from "@/components/projects/add-member-dialog";
 import { MembersTable } from "@/components/projects/members-table";
+import { PendingInvites } from "@/components/projects/pending-invites";
 import { ArchiveProjectButton } from "@/components/projects/archive-project-button";
 
 export default async function ProjectSettingsPage({
@@ -30,11 +31,17 @@ export default async function ProjectSettingsPage({
     );
   }
 
-  const members = await prisma.projectMember.findMany({
-    where: { projectId },
-    include: { user: { select: { name: true, email: true, image: true } } },
-    orderBy: { createdAt: "asc" },
-  });
+  const [members, invites] = await Promise.all([
+    prisma.projectMember.findMany({
+      where: { projectId },
+      include: { user: { select: { name: true, email: true, image: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.projectInvite.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -63,6 +70,9 @@ export default async function ProjectSettingsPage({
             creatorId={project.createdById}
             currentUserId={userId}
           />
+          <div className="mt-4">
+            <PendingInvites invites={invites} />
+          </div>
         </CardContent>
       </Card>
 

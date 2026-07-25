@@ -78,7 +78,9 @@ export function AddMemberDialog({ projectId }: { projectId: string }) {
               required
             />
             <p className="text-xs text-muted-foreground">
-              A pessoa tem de já ter conta criada (GitHub ou registo).
+              Se a pessoa ainda não tiver conta, fica com um convite pendente e
+              entra automaticamente no projeto assim que se registar com este
+              email.
             </p>
           </div>
           <div className="space-y-2">

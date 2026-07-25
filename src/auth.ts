@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { authConfig } from "@/auth.config";
+import { consumeInvitesForEmail, isEmailAllowedToRegister } from "@/lib/invites";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -46,6 +47,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
+    async signIn({ user, account }) {
+      // Credentials: a validacao de convite/owner ja aconteceu em registerAction.
+      if (account?.provider !== "github") return true;
+
+      if (!user.email) return false;
+      const existing = await prisma.user.findUnique({ where: { email: user.email } });
+      if (existing) return true;
+
+      return isEmailAllowedToRegister(user.email);
+    },
     async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id;
@@ -62,6 +73,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       session.githubAccessToken = token.githubAccessToken as string | undefined;
       return session;
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      if (user.id && user.email) {
+        await consumeInvitesForEmail(user.id, user.email);
+      }
     },
   },
 });
