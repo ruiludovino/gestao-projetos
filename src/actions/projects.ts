@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { logActivity } from "@/lib/activity";
 import { requireProjectRole } from "@/lib/permissions";
+import { sendProjectInviteEmail } from "@/lib/email";
 import {
   addMemberSchema,
   createProjectSchema,
@@ -140,9 +141,12 @@ export async function addMemberAction(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const targetUser = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
-  });
+  const [targetUser, inviter, project] = await Promise.all([
+    prisma.user.findUnique({ where: { email: parsed.data.email } }),
+    prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+    prisma.project.findUniqueOrThrow({ where: { id: projectId } }),
+  ]);
+  const inviterName = inviter.name ?? inviter.email ?? "Um admin";
 
   // Ainda nao tem conta: cria-se um convite. A pessoa e adicionada
   // automaticamente ao projeto assim que se registar (ou fizer login com
@@ -164,6 +168,18 @@ export async function addMemberAction(
       },
     });
 
+    try {
+      await sendProjectInviteEmail({
+        to: parsed.data.email,
+        projectName: project.name,
+        inviterName,
+        role: parsed.data.role,
+        hasAccount: false,
+      });
+    } catch (error) {
+      console.error("Falha ao enviar email de convite:", error);
+    }
+
     revalidatePath(`/projetos/${projectId}/definicoes`);
     return {};
   }
@@ -179,8 +195,6 @@ export async function addMemberAction(
     data: { projectId, userId: targetUser.id, role: parsed.data.role },
   });
 
-  const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
-
   await prisma.notification.create({
     data: {
       userId: targetUser.id,
@@ -189,6 +203,18 @@ export async function addMemberAction(
       link: `/projetos/${projectId}`,
     },
   });
+
+  try {
+    await sendProjectInviteEmail({
+      to: parsed.data.email,
+      projectName: project.name,
+      inviterName,
+      role: parsed.data.role,
+      hasAccount: true,
+    });
+  } catch (error) {
+    console.error("Falha ao enviar email de convite:", error);
+  }
 
   await logActivity({
     projectId,
