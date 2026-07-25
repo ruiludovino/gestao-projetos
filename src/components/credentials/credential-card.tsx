@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Copy, Eye, EyeOff, Trash2 } from "lucide-react";
+import { Copy, Eye, EyeOff } from "lucide-react";
 
 import { revealCredentialAction } from "@/actions/credentials";
 import { Button } from "@/components/ui/button";
