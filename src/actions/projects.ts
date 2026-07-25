@@ -10,6 +10,7 @@ import { slugify } from "@/lib/slug";
 import { logActivity } from "@/lib/activity";
 import { requireProjectRole } from "@/lib/permissions";
 import { sendProjectInviteEmail } from "@/lib/email";
+import { isOwnerEmail } from "@/lib/invites";
 import {
   addMemberSchema,
   createProjectSchema,
@@ -23,6 +24,7 @@ async function requireUserId() {
   }
   return session.user.id;
 }
+
 
 async function generateUniqueSlug(name: string) {
   const base = slugify(name) || "projeto";
@@ -43,7 +45,14 @@ export async function createProjectAction(
   _prevState: ProjectFormState,
   formData: FormData,
 ): Promise<ProjectFormState> {
-  const userId = await requireUserId();
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "Não autenticado." };
+  }
+  if (!session.user.email || !isOwnerEmail(session.user.email)) {
+    return { error: "Só o dono da conta pode criar novos projetos." };
+  }
+  const userId = session.user.id;
 
   const parsed = createProjectSchema.safeParse({
     name: formData.get("name"),
