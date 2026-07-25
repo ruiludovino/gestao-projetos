@@ -2,7 +2,7 @@ import { ProjectRole } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-const ROLE_LABELS: Record<ProjectRole, string> = {
+export const ROLE_LABELS: Record<ProjectRole, string> = {
   ADMIN: "Admin",
   DEVELOPER: "Developer",
   VIEWER: "Viewer",

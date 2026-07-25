@@ -5,6 +5,7 @@ import { ProjectRole } from "@prisma/client";
 import { Plus } from "lucide-react";
 
 import { addMemberAction } from "@/actions/projects";
+import { ROLE_LABELS } from "@/components/shared/role-badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -82,7 +83,7 @@ export function AddMemberDialog({ projectId }: { projectId: string }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>
-            <Select name="role" defaultValue={ProjectRole.DEVELOPER}>
+            <Select name="role" items={ROLE_LABELS} defaultValue={ProjectRole.DEVELOPER}>
               <SelectTrigger className="w-full" id="role">
                 <SelectValue />
               </SelectTrigger>

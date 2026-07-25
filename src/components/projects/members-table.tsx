@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { X } from "lucide-react";
 
 import { removeMemberAction, updateMemberRoleAction } from "@/actions/projects";
+import { ROLE_LABELS } from "@/components/shared/role-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -107,6 +108,7 @@ export function MembersTable({
               </TableCell>
               <TableCell>
                 <Select
+                  items={ROLE_LABELS}
                   value={member.role}
                   disabled={isCreator || rowPending}
                   onValueChange={(value) =>
