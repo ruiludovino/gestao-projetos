@@ -19,7 +19,9 @@ export function ProjectNav({ projectId, showCredentials, showSettings }: Project
     { href: base, label: "Dashboard", exact: true },
     { href: `${base}/bugs`, label: "Bugs" },
     { href: `${base}/tarefas`, label: "Tarefas" },
-    ...(showCredentials ? [{ href: `${base}/credenciais`, label: "Credenciais" }] : []),
+    ...(showCredentials
+      ? [{ href: `${base}/credenciais`, label: "Credenciais / Plataformas" }]
+      : []),
     { href: `${base}/notas`, label: "Notas" },
     { href: `${base}/github`, label: "GitHub" },
     ...(showSettings ? [{ href: `${base}/definicoes`, label: "Definições" }] : []),

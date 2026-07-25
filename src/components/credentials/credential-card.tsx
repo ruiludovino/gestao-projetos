@@ -10,11 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EditCredentialDialog } from "@/components/credentials/edit-credential-dialog";
 import { DeleteCredentialButton } from "@/components/credentials/delete-credential-button";
 
+type Member = { userId: string; user: { name: string | null; email: string | null } };
+
 type Credential = {
   id: string;
   serviceName: string;
   url: string | null;
   username: string | null;
+  assigneeId: string | null;
+  assignee: { name: string | null; email: string | null } | null;
 };
 
 async function copyToClipboard(value: string, label: string) {
@@ -26,7 +30,13 @@ async function copyToClipboard(value: string, label: string) {
   }
 }
 
-export function CredentialCard({ credential }: { credential: Credential }) {
+export function CredentialCard({
+  credential,
+  members,
+}: {
+  credential: Credential;
+  members: Member[];
+}) {
   const [revealed, setRevealed] = useState<{ password: string; notes: string | null } | null>(
     null,
   );
@@ -79,11 +89,16 @@ export function CredentialCard({ credential }: { credential: Credential }) {
           )}
         </div>
         <div className="flex gap-1">
-          <EditCredentialDialog credential={credential} />
+          <EditCredentialDialog credential={credential} members={members} />
           <DeleteCredentialButton credentialId={credential.id} />
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="text-sm">
+          <p className="text-xs text-muted-foreground">Responsável</p>
+          <p>{credential.assignee?.name ?? credential.assignee?.email ?? "Ninguém"}</p>
+        </div>
+
         {credential.username && (
           <div className="flex items-center justify-between text-sm">
             <div>

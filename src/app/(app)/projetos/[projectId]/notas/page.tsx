@@ -54,7 +54,10 @@ export default async function NotesPage({
           : {}),
       },
       orderBy: [{ isPinned: "desc" }, { updatedAt: "desc" }],
-      include: { createdBy: { select: { name: true, email: true } } },
+      include: {
+        createdBy: { select: { name: true, email: true } },
+        assignee: { select: { name: true, email: true } },
+      },
     }),
   ]);
 
@@ -125,10 +128,15 @@ export default async function NotesPage({
                     {note.isPinned && <Pin className="size-3.5 text-amber-500" />}
                     <span className="font-medium">{note.title}</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    Atualizada{" "}
-                    {formatDistanceToNow(note.updatedAt, { addSuffix: true, locale: pt })}
-                  </span>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    {note.assignee && (
+                      <span>Responsável: {note.assignee.name ?? note.assignee.email}</span>
+                    )}
+                    <span>
+                      Atualizada{" "}
+                      {formatDistanceToNow(note.updatedAt, { addSuffix: true, locale: pt })}
+                    </span>
+                  </div>
                 </Link>
               </li>
             ))}

@@ -20,14 +20,17 @@ const initialState: NoteFormState = {};
 const NO_FOLDER = "__none__";
 
 type Folder = { id: string; name: string };
+type Member = { userId: string; user: { name: string | null; email: string | null } };
 
 export function NoteForm({
   projectId,
   folders,
+  members,
   defaultFolderId,
 }: {
   projectId: string;
   folders: Folder[];
+  members: Member[];
   defaultFolderId?: string;
 }) {
   const action = createNoteAction.bind(null, projectId);
@@ -59,6 +62,27 @@ export function NoteForm({
             {folders.map((f) => (
               <SelectItem key={f.id} value={f.id}>
                 {f.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="assigneeId">Responsável por resolver</Label>
+        <Select
+          name="assigneeId"
+          items={Object.fromEntries(
+            members.map((member) => [member.userId, member.user.name ?? member.user.email]),
+          )}
+        >
+          <SelectTrigger className="w-full" id="assigneeId">
+            <SelectValue placeholder="Ninguém" />
+          </SelectTrigger>
+          <SelectContent>
+            {members.map((member) => (
+              <SelectItem key={member.userId} value={member.userId}>
+                {member.user.name ?? member.user.email}
               </SelectItem>
             ))}
           </SelectContent>

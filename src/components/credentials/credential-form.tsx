@@ -7,10 +7,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const initialState: CredentialFormState = {};
 
-export function CredentialForm({ projectId }: { projectId: string }) {
+type Member = { userId: string; user: { name: string | null; email: string | null } };
+
+export function CredentialForm({
+  projectId,
+  members,
+}: {
+  projectId: string;
+  members: Member[];
+}) {
   const action = createCredentialAction.bind(null, projectId);
   const [state, formAction, isPending] = useActionState(action, initialState);
   const fieldErrors = state.fieldErrors ?? {};
@@ -47,6 +62,27 @@ export function CredentialForm({ projectId }: { projectId: string }) {
       <div className="space-y-2">
         <Label htmlFor="notes">Notas (opcional)</Label>
         <Textarea id="notes" name="notes" rows={3} />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="assigneeId">Responsável</Label>
+        <Select
+          name="assigneeId"
+          items={Object.fromEntries(
+            members.map((member) => [member.userId, member.user.name ?? member.user.email]),
+          )}
+        >
+          <SelectTrigger className="w-full" id="assigneeId">
+            <SelectValue placeholder="Ninguém" />
+          </SelectTrigger>
+          <SelectContent>
+            {members.map((member) => (
+              <SelectItem key={member.userId} value={member.userId}>
+                {member.user.name ?? member.user.email}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}

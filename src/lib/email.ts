@@ -66,3 +66,42 @@ export async function sendProjectInviteEmail({
     `,
   });
 }
+
+export async function sendAssignmentEmail({
+  to,
+  assignerName,
+  entityLabel,
+  entityTitle,
+  link,
+}: {
+  to: string;
+  assignerName: string;
+  entityLabel: string;
+  entityTitle: string;
+  link: string;
+}) {
+  const resend = getResendClient();
+  if (!resend) {
+    console.warn("RESEND_API_KEY não definida; email de atribuição não enviado.");
+    return;
+  }
+
+  const url = `${getAppUrl()}${link}`;
+
+  await resend.emails.send({
+    from: FROM_ADDRESS,
+    to,
+    subject: `${assignerName} atribuiu-te ${entityLabel} "${entityTitle}"`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2>Foste atribuído</h2>
+        <p><strong>${assignerName}</strong> atribuiu-te ${entityLabel} <strong>${entityTitle}</strong> na Gestão de Projetos.</p>
+        <p style="margin-top: 24px;">
+          <a href="${url}" style="background:#111827;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;display:inline-block;">
+            Ver
+          </a>
+        </p>
+      </div>
+    `,
+  });
+}

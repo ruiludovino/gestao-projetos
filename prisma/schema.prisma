@@ -40,8 +40,10 @@ model User {
   comments       Comment[]
   attachments    Attachment[]
   notes          Note[]          @relation("NoteCreatedBy")
+  assignedNotes  Note[]          @relation("NoteAssignee")
   noteVersions   NoteVersion[]
   credentials    Credential[]    @relation("CredentialCreatedBy")
+  assignedCredentials Credential[] @relation("CredentialAssignee")
   notifications  Notification[]
   activityLogs   ActivityLog[]
   connectedRepos GithubRepo[]    @relation("GithubRepoConnectedBy")
@@ -365,12 +367,14 @@ model Credential {
   notesAuthTag    String?
 
   createdById String
+  assigneeId  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdBy User    @relation("CredentialCreatedBy", fields: [createdById], references: [id])
+  assignee  User?   @relation("CredentialAssignee", fields: [assigneeId], references: [id])
 
   @@index([projectId])
   @@map("credentials")
@@ -405,6 +409,7 @@ model Note {
   isPinned  Boolean @default(false)
 
   createdById String
+  assigneeId  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -412,6 +417,7 @@ model Note {
   project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   folder    NoteFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
   createdBy User          @relation("NoteCreatedBy", fields: [createdById], references: [id])
+  assignee  User?         @relation("NoteAssignee", fields: [assigneeId], references: [id])
   versions  NoteVersion[]
 
   @@index([projectId])
@@ -464,6 +470,8 @@ model GithubRepo {
 enum NotificationType {
   BUG_ATRIBUIDO
   TAREFA_ATRIBUIDA
+  NOTA_ATRIBUIDA
+  CREDENCIAL_ATRIBUIDA
   COMENTARIO
   DEADLINE_PROXIMO
   MEMBRO_ADICIONADO

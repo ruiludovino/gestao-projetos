@@ -6,6 +6,7 @@ export const createCredentialSchema = z.object({
   username: z.string().max(200).optional().or(z.literal("")),
   password: z.string().min(1, "A password é obrigatória").max(500),
   notes: z.string().max(5000).optional().or(z.literal("")),
+  assigneeId: z.string().optional().or(z.literal("")),
 });
 
 export const updateCredentialSchema = createCredentialSchema.extend({

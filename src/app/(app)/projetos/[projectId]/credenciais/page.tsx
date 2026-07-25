@@ -27,15 +27,22 @@ export default async function CredentialsPage({
     );
   }
 
-  const credentials = await prisma.credential.findMany({
-    where: { projectId },
-    orderBy: { serviceName: "asc" },
-  });
+  const [credentials, members] = await Promise.all([
+    prisma.credential.findMany({
+      where: { projectId },
+      orderBy: { serviceName: "asc" },
+      include: { assignee: { select: { name: true, email: true } } },
+    }),
+    prisma.projectMember.findMany({
+      where: { projectId },
+      include: { user: { select: { name: true, email: true } } },
+    }),
+  ]);
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Credenciais</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Credenciais / Plataformas</h1>
         <Button
           render={
             <Link href={`/projetos/${projectId}/credenciais/novo`}>
@@ -51,7 +58,7 @@ export default async function CredentialsPage({
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {credentials.map((credential) => (
-            <CredentialCard key={credential.id} credential={credential} />
+            <CredentialCard key={credential.id} credential={credential} members={members} />
           ))}
         </div>
       )}

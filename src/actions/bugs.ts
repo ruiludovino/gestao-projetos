@@ -10,12 +10,55 @@ import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/activity";
 import { requireProjectMembership, requireProjectRole, canEditContent } from "@/lib/permissions";
 import { createGithubIssue } from "@/lib/github";
+import { sendAssignmentEmail } from "@/lib/email";
 import {
   commentSchema,
   createBugSchema,
   createLabelSchema,
   updateBugSchema,
 } from "@/lib/validations/bug";
+
+async function notifyBugAssignee({
+  bugId,
+  bugTitle,
+  projectId,
+  assigneeId,
+  actorId,
+}: {
+  bugId: string;
+  bugTitle: string;
+  projectId: string;
+  assigneeId: string;
+  actorId: string;
+}) {
+  const [actor, assignee] = await Promise.all([
+    prisma.user.findUnique({ where: { id: actorId } }),
+    prisma.user.findUnique({ where: { id: assigneeId } }),
+  ]);
+
+  await prisma.notification.create({
+    data: {
+      userId: assigneeId,
+      type: NotificationType.BUG_ATRIBUIDO,
+      title: `Foste atribuído ao bug "${bugTitle}"`,
+      link: `/projetos/${projectId}/bugs/${bugId}`,
+    },
+  });
+
+  if (assignee?.email) {
+    try {
+      await sendAssignmentEmail({
+        to: assignee.email,
+        assignerName: actor?.name ?? actor?.email ?? "Um colega",
+        entityLabel: "o bug",
+        entityTitle: bugTitle,
+        link: `/projetos/${projectId}/bugs/${bugId}`,
+      });
+    } catch (error) {
+      console.error("Falha ao enviar email de atribuição de bug:", error);
+    }
+  }
+}
 
 async function requireUserId() {
   const session = await auth();
@@ -89,6 +132,16 @@ export async function createBugAction(
     entityId: bug.id,
     metadata: { title: bug.title, number: bug.number },
   });
+
+  if (bug.assigneeId && bug.assigneeId !== userId) {
+    await notifyBugAssignee({
+      bugId: bug.id,
+      bugTitle: bug.title,
+      projectId,
+      assigneeId: bug.assigneeId,
+      actorId: userId,
+    });
+  }
 
   revalidatePath(`/projetos/${projectId}/bugs`);
   redirect(`/projetos/${projectId}/bugs/${bug.id}`);
@@ -181,13 +234,12 @@ export async function updateBugAssigneeAction(bugId: string, assigneeId: string 
   });
 
   if (assigneeId && assigneeId !== userId) {
-    await prisma.notification.create({
-      data: {
-        userId: assigneeId,
-        type: NotificationType.BUG_ATRIBUIDO,
-        title: `Foste atribuído ao bug "${bug.title}"`,
-        link: `/projetos/${bug.projectId}/bugs/${bugId}`,
-      },
+    await notifyBugAssignee({
+      bugId,
+      bugTitle: bug.title,
+      projectId: bug.projectId,
+      assigneeId,
+      actorId: userId,
     });
   }
 

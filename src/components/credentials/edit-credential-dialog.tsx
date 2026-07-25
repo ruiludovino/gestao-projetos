@@ -18,15 +18,33 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const NO_ASSIGNEE = "__unassigned__";
+
+type Member = { userId: string; user: { name: string | null; email: string | null } };
 
 type Credential = {
   id: string;
   serviceName: string;
   url: string | null;
   username: string | null;
+  assigneeId: string | null;
 };
 
-export function EditCredentialDialog({ credential }: { credential: Credential }) {
+export function EditCredentialDialog({
+  credential,
+  members,
+}: {
+  credential: Credential;
+  members: Member[];
+}) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -113,6 +131,31 @@ export function EditCredentialDialog({ credential }: { credential: Credential })
               onChange={(event) => setNotes(event.target.value)}
               disabled={loadingNotes}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="assigneeId">Responsável</Label>
+            <Select
+              name="assigneeId"
+              items={{
+                [NO_ASSIGNEE]: "Ninguém",
+                ...Object.fromEntries(
+                  members.map((member) => [member.userId, member.user.name ?? member.user.email]),
+                ),
+              }}
+              defaultValue={credential.assigneeId ?? NO_ASSIGNEE}
+            >
+              <SelectTrigger className="w-full" id="assigneeId">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_ASSIGNEE}>Ninguém</SelectItem>
+                {members.map((member) => (
+                  <SelectItem key={member.userId} value={member.userId}>
+                    {member.user.name ?? member.user.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>

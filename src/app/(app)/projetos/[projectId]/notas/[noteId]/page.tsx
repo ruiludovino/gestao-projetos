@@ -2,8 +2,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMembership } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { EditNoteForm } from "@/components/notes/edit-note-form";
+import { NoteAssigneeSelect } from "@/components/notes/note-assignee-select";
 import { PinNoteButton } from "@/components/notes/pin-note-button";
 import { DeleteNoteButton } from "@/components/notes/delete-note-button";
 import { VersionHistory } from "@/components/notes/version-history";
@@ -17,7 +19,7 @@ export default async function NoteDetailPage({
   const session = await auth();
   const userId = session!.user.id;
 
-  const [membership, note] = await Promise.all([
+  const [membership, note, members] = await Promise.all([
     getMembership(projectId, userId),
     prisma.note.findUniqueOrThrow({
       where: { id: noteId },
@@ -28,6 +30,10 @@ export default async function NoteDetailPage({
         },
       },
     }),
+    prisma.projectMember.findMany({
+      where: { projectId },
+      include: { user: { select: { name: true, email: true } } },
+    }),
   ]);
 
   const canEdit = canEditContent(membership.role);
@@ -37,6 +43,16 @@ export default async function NoteDetailPage({
       <div className="flex items-center justify-between">
         <PinNoteButton noteId={note.id} isPinned={note.isPinned} />
         {canEdit && <DeleteNoteButton noteId={note.id} />}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Label className="text-xs text-muted-foreground">Responsável por resolver</Label>
+        <NoteAssigneeSelect
+          noteId={note.id}
+          value={note.assigneeId}
+          members={members}
+          disabled={!canEdit}
+        />
       </div>
 
       <EditNoteForm noteId={note.id} title={note.title} content={note.content} canEdit={canEdit} />

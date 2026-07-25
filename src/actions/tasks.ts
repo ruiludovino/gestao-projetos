@@ -8,12 +8,55 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/activity";
 import { requireProjectMembership, requireProjectRole, canEditContent } from "@/lib/permissions";
+import { sendAssignmentEmail } from "@/lib/email";
 import {
   createTaskSchema,
   githubLinkSchema,
   subtaskSchema,
   updateTaskSchema,
 } from "@/lib/validations/task";
+
+async function notifyTaskAssignee({
+  taskId,
+  taskTitle,
+  projectId,
+  assigneeId,
+  actorId,
+}: {
+  taskId: string;
+  taskTitle: string;
+  projectId: string;
+  assigneeId: string;
+  actorId: string;
+}) {
+  const [actor, assignee] = await Promise.all([
+    prisma.user.findUnique({ where: { id: actorId } }),
+    prisma.user.findUnique({ where: { id: assigneeId } }),
+  ]);
+
+  await prisma.notification.create({
+    data: {
+      userId: assigneeId,
+      type: NotificationType.TAREFA_ATRIBUIDA,
+      title: `Foste atribuído à tarefa "${taskTitle}"`,
+      link: `/projetos/${projectId}/tarefas/${taskId}`,
+    },
+  });
+
+  if (assignee?.email) {
+    try {
+      await sendAssignmentEmail({
+        to: assignee.email,
+        assignerName: actor?.name ?? actor?.email ?? "Um colega",
+        entityLabel: "a tarefa",
+        entityTitle: taskTitle,
+        link: `/projetos/${projectId}/tarefas/${taskId}`,
+      });
+    } catch (error) {
+      console.error("Falha ao enviar email de atribuição de tarefa:", error);
+    }
+  }
+}
 
 async function requireUserId() {
   const session = await auth();
@@ -90,6 +133,16 @@ export async function createTaskAction(
     entityId: task.id,
     metadata: { title: task.title, number: task.number },
   });
+
+  if (task.assigneeId && task.assigneeId !== userId) {
+    await notifyTaskAssignee({
+      taskId: task.id,
+      taskTitle: task.title,
+      projectId,
+      assigneeId: task.assigneeId,
+      actorId: userId,
+    });
+  }
 
   revalidatePath(`/projetos/${projectId}/tarefas`);
   revalidatePath(`/projetos/${projectId}/tarefas/lista`);
@@ -189,13 +242,12 @@ export async function updateTaskAssigneeAction(taskId: string, assigneeId: strin
   });
 
   if (assigneeId && assigneeId !== userId) {
-    await prisma.notification.create({
-      data: {
-        userId: assigneeId,
-        type: NotificationType.TAREFA_ATRIBUIDA,
-        title: `Foste atribuído à tarefa "${task.title}"`,
-        link: `/projetos/${task.projectId}/tarefas/${taskId}`,
-      },
+    await notifyTaskAssignee({
+      taskId,
+      taskTitle: task.title,
+      projectId: task.projectId,
+      assigneeId,
+      actorId: userId,
     });
   }
 

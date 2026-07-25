@@ -9,6 +9,7 @@ export const createNoteSchema = z.object({
   title: z.string().min(1, "Título obrigatório").max(200),
   content: z.string().max(50000).optional().or(z.literal("")),
   folderId: z.string().optional().or(z.literal("")),
+  assigneeId: z.string().optional().or(z.literal("")),
 });
 
 export const updateNoteSchema = z.object({

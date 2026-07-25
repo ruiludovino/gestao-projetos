@@ -12,10 +12,16 @@ export default async function NewNotePage({
   const { projectId } = await params;
   const { folder } = await searchParams;
 
-  const folders = await prisma.noteFolder.findMany({
-    where: { projectId },
-    orderBy: { name: "asc" },
-  });
+  const [folders, members] = await Promise.all([
+    prisma.noteFolder.findMany({
+      where: { projectId },
+      orderBy: { name: "asc" },
+    }),
+    prisma.projectMember.findMany({
+      where: { projectId },
+      include: { user: { select: { name: true, email: true } } },
+    }),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -25,7 +31,12 @@ export default async function NewNotePage({
           <CardTitle>Detalhes</CardTitle>
         </CardHeader>
         <CardContent>
-          <NoteForm projectId={projectId} folders={folders} defaultFolderId={folder} />
+          <NoteForm
+            projectId={projectId}
+            folders={folders}
+            members={members}
+            defaultFolderId={folder}
+          />
         </CardContent>
       </Card>
     </div>
