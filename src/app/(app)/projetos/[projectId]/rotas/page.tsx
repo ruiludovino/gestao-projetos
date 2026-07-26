@@ -1,0 +1,111 @@
+import Link from "next/link";
+import { Plus } from "lucide-react";
+
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { getMembership } from "@/lib/project-data";
+import { canEditContent, isCurrentUserOwner } from "@/lib/permissions";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { EditAppRouteDialog } from "@/components/app-routes/edit-app-route-dialog";
+import { DeleteAppRouteButton } from "@/components/app-routes/delete-app-route-button";
+
+export default async function AppRoutesPage({
+  params,
+}: {
+  params: Promise<{ projectId: string }>;
+}) {
+  const { projectId } = await params;
+  const session = await auth();
+  const userId = session!.user.id;
+
+  const [membership, isOwner, routes] = await Promise.all([
+    getMembership(projectId, userId),
+    isCurrentUserOwner(),
+    prisma.appRoute.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "asc" },
+      include: { createdBy: { select: { name: true, email: true } } },
+    }),
+  ]);
+
+  const canEdit = canEditContent(membership.role);
+
+  return (
+    <div>
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold tracking-tight">Rotas da Aplicação</h1>
+        {canEdit && (
+          <Button
+            render={
+              <Link href={`/projetos/${projectId}/rotas/nova`}>
+                <Plus className="size-4" />
+                Nova rota
+              </Link>
+            }
+          />
+        )}
+      </div>
+
+      {routes.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Ainda não há rotas registadas.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Descrição</TableHead>
+              <TableHead>Link</TableHead>
+              <TableHead>Notas</TableHead>
+              <TableHead>Criado por</TableHead>
+              {canEdit && <TableHead className="w-20">Ações</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {routes.map((route) => (
+              <TableRow key={route.id}>
+                <TableCell className="font-medium">{route.description}</TableCell>
+                <TableCell>
+                  <a
+                    href={route.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    {route.link}
+                  </a>
+                </TableCell>
+                <TableCell>
+                  <span className="whitespace-pre-wrap text-sm text-muted-foreground">
+                    {route.notes || "—"}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm">
+                    {route.createdBy.name ?? route.createdBy.email}
+                  </span>
+                </TableCell>
+                {canEdit && (
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <EditAppRouteDialog route={route} />
+                      {(isOwner || route.createdById === userId) && (
+                        <DeleteAppRouteButton routeId={route.id} />
+                      )}
+                    </div>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}

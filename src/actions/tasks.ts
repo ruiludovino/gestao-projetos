@@ -16,8 +16,10 @@ import {
 } from "@/lib/permissions";
 import { sendAssignmentEmail } from "@/lib/email";
 import {
+  createTaskFolderSchema,
   createTaskSchema,
   githubLinkSchema,
+  renameTaskFolderSchema,
   subtaskSchema,
   updateTaskSchema,
 } from "@/lib/validations/task";
@@ -82,6 +84,81 @@ export type TaskFormState = {
   fieldErrors?: Record<string, string[]>;
 };
 
+export async function createFolderAction(
+  projectId: string,
+  _prevState: TaskFormState,
+  formData: FormData,
+): Promise<TaskFormState> {
+  const userId = await requireUserId();
+  await requireProjectRole(userId, projectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  const parentId = formData.get("parentId");
+  const parsed = createTaskFolderSchema.safeParse({
+    name: formData.get("name"),
+    parentId: parentId ? String(parentId) : "",
+  });
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  await prisma.taskFolder.create({
+    data: {
+      projectId,
+      name: parsed.data.name,
+      parentId: parsed.data.parentId || null,
+    },
+  });
+
+  revalidatePath(`/projetos/${projectId}/tarefas`);
+  revalidatePath(`/projetos/${projectId}/tarefas/lista`);
+  return {};
+}
+
+export async function renameFolderAction(
+  folderId: string,
+  _prevState: TaskFormState,
+  formData: FormData,
+): Promise<TaskFormState> {
+  const folder = await prisma.taskFolder.findUniqueOrThrow({ where: { id: folderId } });
+  const userId = await requireUserId();
+  await requireProjectRole(userId, folder.projectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  const parsed = renameTaskFolderSchema.safeParse({ name: formData.get("name") });
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  await prisma.taskFolder.update({ where: { id: folderId }, data: { name: parsed.data.name } });
+
+  revalidatePath(`/projetos/${folder.projectId}/tarefas`);
+  revalidatePath(`/projetos/${folder.projectId}/tarefas/lista`);
+  return {};
+}
+
+export async function deleteFolderAction(folderId: string) {
+  const folder = await prisma.taskFolder.findUniqueOrThrow({ where: { id: folderId } });
+  const userId = await requireUserId();
+  await requireProjectRole(userId, folder.projectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  await prisma.taskFolder.delete({ where: { id: folderId } });
+
+  revalidatePath(`/projetos/${folder.projectId}/tarefas`);
+  revalidatePath(`/projetos/${folder.projectId}/tarefas/lista`);
+}
+
+export async function moveTaskToFolderAction(taskId: string, folderId: string | null) {
+  const { task, membership } = await requireTaskAccess(taskId);
+  if (!canEditContent(membership.role)) {
+    throw new Error("Não tens permissão para editar esta tarefa.");
+  }
+
+  await prisma.task.update({ where: { id: taskId }, data: { folderId } });
+
+  revalidatePath(`/projetos/${task.projectId}/tarefas`);
+  revalidatePath(`/projetos/${task.projectId}/tarefas/lista`);
+  revalidatePath(`/projetos/${task.projectId}/tarefas/${taskId}`);
+}
+
 export async function createTaskAction(
   projectId: string,
   _prevState: TaskFormState,
@@ -92,6 +169,7 @@ export async function createTaskAction(
 
   const assigneeId = formData.get("assigneeId");
   const deadline = formData.get("deadline");
+  const folderId = formData.get("folderId");
 
   const parsed = createTaskSchema.safeParse({
     title: formData.get("title"),
@@ -99,6 +177,7 @@ export async function createTaskAction(
     priority: formData.get("priority"),
     assigneeId: assigneeId ? String(assigneeId) : "",
     deadline: deadline ? String(deadline) : "",
+    folderId: folderId && folderId !== "__none__" ? String(folderId) : "",
   });
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
@@ -127,6 +206,7 @@ export async function createTaskAction(
         assigneeId: parsed.data.assigneeId || userId,
         createdById: userId,
         deadline: parsed.data.deadline ? new Date(parsed.data.deadline) : null,
+        folderId: parsed.data.folderId || null,
         position: (maxPosition._max.position ?? -1) + 1,
       },
     });
@@ -338,6 +418,75 @@ export async function moveTaskAction(
   revalidatePath(`/projetos/${task.projectId}/tarefas/${taskId}`);
 }
 
+export async function copyTaskToProjectAction(taskId: string, targetProjectId: string) {
+  const { task, userId } = await requireTaskAccess(taskId);
+  await requireProjectRole(userId, targetProjectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  const subtasks = await prisma.task.findMany({
+    where: { parentTaskId: taskId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const newTaskId = await prisma.$transaction(async (tx) => {
+    const maxPosition = await tx.task.aggregate({
+      where: { projectId: targetProjectId, status: task.status, parentTaskId: null },
+      _max: { position: true },
+    });
+
+    const project = await tx.project.update({
+      where: { id: targetProjectId },
+      data: { taskSeq: { increment: 1 } },
+    });
+
+    const newTask = await tx.task.create({
+      data: {
+        projectId: targetProjectId,
+        number: project.taskSeq,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        status: task.status,
+        deadline: task.deadline,
+        createdById: userId,
+        position: (maxPosition._max.position ?? -1) + 1,
+      },
+    });
+
+    for (const subtask of subtasks) {
+      const subtaskProject = await tx.project.update({
+        where: { id: targetProjectId },
+        data: { taskSeq: { increment: 1 } },
+      });
+      await tx.task.create({
+        data: {
+          projectId: targetProjectId,
+          number: subtaskProject.taskSeq,
+          title: subtask.title,
+          priority: subtask.priority,
+          status: subtask.status,
+          parentTaskId: newTask.id,
+          createdById: userId,
+        },
+      });
+    }
+
+    return newTask.id;
+  });
+
+  await logActivity({
+    projectId: targetProjectId,
+    userId,
+    action: "tarefa.copiada",
+    entityType: "task",
+    entityId: newTaskId,
+    metadata: { title: task.title, fromProjectId: task.projectId, fromTaskId: task.id },
+  });
+
+  revalidatePath(`/projetos/${targetProjectId}/tarefas`);
+  revalidatePath(`/projetos/${targetProjectId}/tarefas/lista`);
+  return { id: newTaskId };
+}
+
 export async function createSubtaskAction(
   parentTaskId: string,
   _prevState: TaskFormState,
@@ -371,6 +520,19 @@ export async function createSubtaskAction(
 
   revalidatePath(`/projetos/${task.projectId}/tarefas/${parentTaskId}`);
   return {};
+}
+
+export async function deleteSubtaskAction(subtaskId: string) {
+  const { task, membership } = await requireTaskAccess(subtaskId);
+  if (!canEditContent(membership.role)) {
+    throw new Error("Não tens permissão para editar esta tarefa.");
+  }
+
+  await prisma.task.delete({ where: { id: subtaskId } });
+
+  if (task.parentTaskId) {
+    revalidatePath(`/projetos/${task.projectId}/tarefas/${task.parentTaskId}`);
+  }
 }
 
 export async function toggleSubtaskDoneAction(subtaskId: string) {

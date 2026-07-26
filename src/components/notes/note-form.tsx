@@ -71,7 +71,7 @@ export function NoteForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="assigneeId">Responsável por resolver</Label>
+        <Label htmlFor="assigneeId">Responsável</Label>
         <Select
           name="assigneeId"
           items={Object.fromEntries(

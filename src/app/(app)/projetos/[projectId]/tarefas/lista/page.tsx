@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Folder } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { TaskStatus } from "@prisma/client";
@@ -24,33 +24,51 @@ import { TaskStatusBadge } from "@/components/shared/task-status-badge";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { ResolveTaskButton } from "@/components/tasks/resolve-task-button";
 import { DeleteTaskButton } from "@/components/tasks/delete-task-button";
+import { CreateFolderPopover } from "@/components/tasks/create-folder-popover";
+import { TaskFolderActions } from "@/components/tasks/task-folder-actions";
+import { cn } from "@/lib/utils";
+
+function buildFolderDepths(folders: { id: string; parentId: string | null }[]) {
+  const depthById = new Map<string, number>();
+  function depthOf(id: string): number {
+    if (depthById.has(id)) return depthById.get(id)!;
+    const folder = folders.find((f) => f.id === id);
+    const depth = folder?.parentId ? depthOf(folder.parentId) + 1 : 0;
+    depthById.set(id, depth);
+    return depth;
+  }
+  for (const folder of folders) depthOf(folder.id);
+  return depthById;
+}
 
 export default async function TasksListPage({
   params,
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ responsavel?: string; estado?: string }>;
+  searchParams: Promise<{ responsavel?: string; estado?: string; folder?: string }>;
 }) {
   const { projectId } = await params;
-  const { responsavel, estado } = await searchParams;
+  const { responsavel, estado, folder } = await searchParams;
   const isHistory = estado === "historico";
   const session = await auth();
   const userId = session!.user.id;
   const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
 
-  const [membership, members, tasks] = await Promise.all([
+  const [membership, members, folders, tasks] = await Promise.all([
     getMembership(projectId, userId),
     prisma.projectMember.findMany({
       where: { projectId },
       include: { user: { select: { name: true, email: true } } },
     }),
+    prisma.taskFolder.findMany({ where: { projectId }, orderBy: { name: "asc" } }),
     prisma.task.findMany({
       where: {
         projectId,
         parentTaskId: null,
         status: isHistory ? TaskStatus.DONE : { not: TaskStatus.DONE },
         ...(responsavel ? { assigneeId: responsavel } : {}),
+        ...(folder ? { folderId: folder } : {}),
       },
       orderBy: [{ status: "asc" }, { position: "asc" }],
       include: {
@@ -60,19 +78,63 @@ export default async function TasksListPage({
     }),
   ]);
 
+  const canEdit = canEditContent(membership.role);
+  const depths = buildFolderDepths(folders);
+
   const toggleParams = new URLSearchParams();
   if (!isHistory) toggleParams.set("estado", "historico");
   if (responsavel) toggleParams.set("responsavel", responsavel);
+  if (folder) toggleParams.set("folder", folder);
   const toggleQuery = toggleParams.toString();
   const toggleHref = `/projetos/${projectId}/tarefas/lista${toggleQuery ? `?${toggleQuery}` : ""}`;
 
   return (
-    <div>
+    <div className="flex gap-8">
+      <aside className="w-56 shrink-0 space-y-1">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">Pastas</span>
+          {canEdit && <CreateFolderPopover projectId={projectId} />}
+        </div>
+        <Link
+          href={`/projetos/${projectId}/tarefas/lista`}
+          className={cn(
+            "block rounded-md px-2 py-1.5 text-sm hover:bg-accent",
+            !folder && "bg-accent font-medium",
+          )}
+        >
+          Todas as tarefas
+        </Link>
+        {folders.map((f) => (
+          <div
+            key={f.id}
+            className={cn(
+              "group flex items-center justify-between rounded-md pr-1 text-sm hover:bg-accent",
+              folder === f.id && "bg-accent font-medium",
+            )}
+          >
+            <Link
+              href={`/projetos/${projectId}/tarefas/lista?folder=${f.id}`}
+              style={{ paddingLeft: `${8 + (depths.get(f.id) ?? 0) * 12}px` }}
+              className="flex flex-1 items-center gap-1.5 py-1.5"
+            >
+              <Folder className="size-3.5 text-muted-foreground" />
+              {f.name}
+            </Link>
+            {canEdit && (
+              <span className="opacity-0 group-hover:opacity-100">
+                <TaskFolderActions folderId={f.id} name={f.name} />
+              </span>
+            )}
+          </div>
+        ))}
+      </aside>
+
+      <div className="flex-1">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-semibold tracking-tight">Tarefas</h1>
           <Link
-            href={`/projetos/${projectId}/tarefas`}
+            href={`/projetos/${projectId}/tarefas${folder ? `?folder=${folder}` : ""}`}
             className="text-sm text-muted-foreground hover:underline"
           >
             Ver como kanban
@@ -83,10 +145,10 @@ export default async function TasksListPage({
         </div>
         <div className="flex items-center gap-2">
           <AssigneeFilter members={members} />
-          {canEditContent(membership.role) && !isHistory && (
+          {canEdit && !isHistory && (
             <Button
               render={
-                <Link href={`/projetos/${projectId}/tarefas/novo`}>
+                <Link href={`/projetos/${projectId}/tarefas/novo${folder ? `?folder=${folder}` : ""}`}>
                   <Plus className="size-4" />
                   Nova tarefa
                 </Link>
@@ -182,6 +244,7 @@ export default async function TasksListPage({
           </TableBody>
         </Table>
       )}
+      </div>
     </div>
   );
 }

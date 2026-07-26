@@ -253,6 +253,46 @@ export async function deleteCredentialAction(credentialId: string) {
   revalidatePath(`/projetos/${credential.projectId}/credenciais`);
 }
 
+export async function copyCredentialToProjectAction(credentialId: string, targetProjectId: string) {
+  const credential = await prisma.credential.findUniqueOrThrow({ where: { id: credentialId } });
+  await requireCredentialsAccess(credential.projectId);
+  const { userId } = await requireCredentialsAccess(targetProjectId);
+
+  const newCredential = await prisma.credential.create({
+    data: {
+      projectId: targetProjectId,
+      serviceName: credential.serviceName,
+      url: credential.url,
+      username: credential.username,
+      passwordCiphertext: credential.passwordCiphertext,
+      passwordIv: credential.passwordIv,
+      passwordAuthTag: credential.passwordAuthTag,
+      notesCiphertext: credential.notesCiphertext,
+      notesIv: credential.notesIv,
+      notesAuthTag: credential.notesAuthTag,
+      cost: credential.cost,
+      billingCycle: credential.billingCycle,
+      createdById: userId,
+    },
+  });
+
+  await logActivity({
+    projectId: targetProjectId,
+    userId,
+    action: "credencial.copiada",
+    entityType: "credential",
+    entityId: newCredential.id,
+    metadata: {
+      serviceName: newCredential.serviceName,
+      fromProjectId: credential.projectId,
+      fromCredentialId: credential.id,
+    },
+  });
+
+  revalidatePath(`/projetos/${targetProjectId}/credenciais`);
+  return { id: newCredential.id };
+}
+
 export async function revealCredentialAction(credentialId: string) {
   const credential = await prisma.credential.findUniqueOrThrow({ where: { id: credentialId } });
   const { userId } = await requireCredentialsAccess(credential.projectId);

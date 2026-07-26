@@ -3,7 +3,7 @@ import { pt } from "date-fns/locale";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getMembership } from "@/lib/project-data";
+import { getMembership, getCopyTargetProjects } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
 import { isOwnerEmail } from "@/lib/invites";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,10 +13,13 @@ import { TaskStatusSelect } from "@/components/tasks/task-status-select";
 import { TaskPrioritySelect } from "@/components/tasks/task-priority-select";
 import { TaskAssigneeSelect } from "@/components/tasks/task-assignee-select";
 import { TaskDeadlinePicker } from "@/components/tasks/task-deadline-picker";
+import { TaskFolderSelect } from "@/components/tasks/task-folder-select";
 import { SubtasksSection } from "@/components/tasks/subtasks-section";
 import { TaskGithubLinks } from "@/components/tasks/task-github-links";
 import { TaskCommentForm } from "@/components/tasks/task-comment-form";
 import { DeleteTaskButton } from "@/components/tasks/delete-task-button";
+import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
+import { copyTaskToProjectAction } from "@/actions/tasks";
 
 export default async function TaskDetailPage({
   params,
@@ -27,7 +30,7 @@ export default async function TaskDetailPage({
   const session = await auth();
   const userId = session!.user.id;
 
-  const [membership, task, members] = await Promise.all([
+  const [membership, task, members, folders, copyTargetProjects] = await Promise.all([
     getMembership(projectId, userId),
     prisma.task.findUniqueOrThrow({
       where: { id: taskId },
@@ -44,6 +47,8 @@ export default async function TaskDetailPage({
       where: { projectId },
       include: { user: { select: { name: true, email: true } } },
     }),
+    prisma.taskFolder.findMany({ where: { projectId }, orderBy: { name: "asc" } }),
+    getCopyTargetProjects(userId, projectId),
   ]);
 
   const canEdit = canEditContent(membership.role);
@@ -54,9 +59,16 @@ export default async function TaskDetailPage({
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <span className="font-mono text-sm text-muted-foreground">TASK-{task.number}</span>
-        {canDelete && (
-          <DeleteTaskButton taskId={task.id} redirectTo={`/projetos/${projectId}/tarefas/lista`} />
-        )}
+        <div className="flex items-center gap-2">
+          <CopyToProjectDialog
+            projects={copyTargetProjects}
+            onCopy={(targetProjectId) => copyTaskToProjectAction(task.id, targetProjectId)}
+            triggerLabel="Copiar para projeto"
+          />
+          {canDelete && (
+            <DeleteTaskButton taskId={task.id} redirectTo={`/projetos/${projectId}/tarefas/lista`} />
+          )}
+        </div>
       </div>
 
       <EditTaskDetailsForm
@@ -89,6 +101,15 @@ export default async function TaskDetailPage({
           <TaskDeadlinePicker
             taskId={task.id}
             value={task.deadline?.toISOString() ?? null}
+            disabled={!canEdit}
+          />
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Pasta</p>
+          <TaskFolderSelect
+            taskId={task.id}
+            value={task.folderId}
+            folders={folders}
             disabled={!canEdit}
           />
         </div>

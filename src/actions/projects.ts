@@ -144,18 +144,8 @@ export async function deleteProjectAction(projectId: string) {
     throw new Error("Só podes apagar projetos que tu próprio criaste.");
   }
 
-  const [bugsCount, tasksCount, notesCount, credentialsCount] = await Promise.all([
-    prisma.bug.count({ where: { projectId } }),
-    prisma.task.count({ where: { projectId } }),
-    prisma.note.count({ where: { projectId } }),
-    prisma.credential.count({ where: { projectId } }),
-  ]);
-  if (bugsCount + tasksCount + notesCount + credentialsCount > 0) {
-    throw new Error(
-      "Só podes apagar projetos sem bugs, tarefas, notas ou credenciais. Remove o conteúdo primeiro.",
-    );
-  }
-
+  // Bugs, tarefas, notas, credenciais e restantes registos ligados ao projeto
+  // sao apagados em cascata pela BD (onDelete: Cascade no schema).
   await prisma.project.delete({ where: { id: projectId } });
 
   revalidatePath("/projetos");

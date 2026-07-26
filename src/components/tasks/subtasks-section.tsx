@@ -3,8 +3,14 @@
 import { useActionState, useRef, useTransition } from "react";
 import { TaskStatus } from "@prisma/client";
 import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 
-import { createSubtaskAction, toggleSubtaskDoneAction, type TaskFormState } from "@/actions/tasks";
+import {
+  createSubtaskAction,
+  deleteSubtaskAction,
+  toggleSubtaskDoneAction,
+  type TaskFormState,
+} from "@/actions/tasks";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -25,6 +31,7 @@ export function SubtasksSection({
   const action = createSubtaskAction.bind(null, parentTaskId);
   const [, formAction, isPending] = useActionState(action, initialState);
   const [isToggling, startTransition] = useTransition();
+  const [isDeleting, startDeleteTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
 
   function handleToggle(subtaskId: string) {
@@ -37,19 +44,44 @@ export function SubtasksSection({
     });
   }
 
+  function handleDelete(subtaskId: string) {
+    startDeleteTransition(async () => {
+      try {
+        await deleteSubtaskAction(subtaskId);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Erro ao remover subtarefa.");
+      }
+    });
+  }
+
   return (
     <div className="space-y-2">
       {subtasks.map((subtask) => (
-        <label key={subtask.id} className="flex items-center gap-2 text-sm">
-          <Checkbox
-            checked={subtask.status === TaskStatus.DONE}
-            disabled={!canEdit || isToggling}
-            onCheckedChange={() => handleToggle(subtask.id)}
-          />
-          <span className={subtask.status === TaskStatus.DONE ? "text-muted-foreground line-through" : ""}>
-            {subtask.title}
-          </span>
-        </label>
+        <div key={subtask.id} className="group flex items-center justify-between gap-2">
+          <label className="flex flex-1 items-center gap-2 text-sm">
+            <Checkbox
+              checked={subtask.status === TaskStatus.DONE}
+              disabled={!canEdit || isToggling}
+              onCheckedChange={() => handleToggle(subtask.id)}
+            />
+            <span className={subtask.status === TaskStatus.DONE ? "text-muted-foreground line-through" : ""}>
+              {subtask.title}
+            </span>
+          </label>
+          {canEdit && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="opacity-0 group-hover:opacity-100"
+              disabled={isDeleting}
+              aria-label="Remover subtarefa"
+              onClick={() => handleDelete(subtask.id)}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          )}
+        </div>
       ))}
 
       {canEdit && (

@@ -23,6 +23,7 @@ export function ProjectNav({ projectId, showCredentials, showSettings }: Project
       ? [{ href: `${base}/credenciais`, label: "Credenciais / Plataformas" }]
       : []),
     { href: `${base}/notas`, label: "Notas" },
+    { href: `${base}/rotas`, label: "Rotas Da Aplicação" },
     { href: `${base}/github`, label: "GitHub" },
     ...(showSettings ? [{ href: `${base}/definicoes`, label: "Definições" }] : []),
   ];

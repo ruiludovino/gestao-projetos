@@ -36,23 +36,17 @@ export default async function ProjectSettingsPage({
   const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
   const canDeleteProject = isOwner || project.createdById === userId;
 
-  const [members, invites, bugsCount, tasksCount, notesCount, credentialsCount] =
-    await Promise.all([
-      prisma.projectMember.findMany({
-        where: { projectId },
-        include: { user: { select: { name: true, email: true, image: true } } },
-        orderBy: { createdAt: "asc" },
-      }),
-      prisma.projectInvite.findMany({
-        where: { projectId },
-        orderBy: { createdAt: "asc" },
-      }),
-      prisma.bug.count({ where: { projectId } }),
-      prisma.task.count({ where: { projectId } }),
-      prisma.note.count({ where: { projectId } }),
-      prisma.credential.count({ where: { projectId } }),
-    ]);
-  const isEmpty = bugsCount + tasksCount + notesCount + credentialsCount === 0;
+  const [members, invites] = await Promise.all([
+    prisma.projectMember.findMany({
+      where: { projectId },
+      include: { user: { select: { name: true, email: true, image: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.projectInvite.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -93,9 +87,7 @@ export default async function ProjectSettingsPage({
         </CardHeader>
         <CardContent className="space-y-4">
           <ArchiveProjectButton projectId={projectId} archived={project.archived} />
-          {canDeleteProject && (
-            <DeleteProjectButton projectId={projectId} isEmpty={isEmpty} />
-          )}
+          {canDeleteProject && <DeleteProjectButton projectId={projectId} />}
         </CardContent>
       </Card>
     </div>

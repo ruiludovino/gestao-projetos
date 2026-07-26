@@ -11,9 +11,11 @@ import { isOwnerEmail } from "@/lib/invites";
 import { Button } from "@/components/ui/button";
 import { NotesSearch } from "@/components/notes/notes-search";
 import { CreateFolderPopover } from "@/components/notes/create-folder-popover";
+import { NoteFolderActions } from "@/components/notes/note-folder-actions";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { ResolveNoteButton } from "@/components/notes/resolve-note-button";
 import { DeleteNoteButton } from "@/components/notes/delete-note-button";
+import { CopyNoteContentButton } from "@/components/notes/copy-note-content-button";
 import { cn } from "@/lib/utils";
 
 function buildFolderDepths(folders: { id: string; parentId: string | null }[]) {
@@ -100,18 +102,27 @@ export default async function NotesPage({
           Todas as notas
         </Link>
         {folders.map((f) => (
-          <Link
+          <div
             key={f.id}
-            href={`/projetos/${projectId}/notas?folder=${f.id}`}
-            style={{ paddingLeft: `${8 + (depths.get(f.id) ?? 0) * 12}px` }}
             className={cn(
-              "flex items-center gap-1.5 rounded-md py-1.5 pr-2 text-sm hover:bg-accent",
+              "group flex items-center justify-between rounded-md pr-1 text-sm hover:bg-accent",
               folder === f.id && "bg-accent font-medium",
             )}
           >
-            <Folder className="size-3.5 text-muted-foreground" />
-            {f.name}
-          </Link>
+            <Link
+              href={`/projetos/${projectId}/notas?folder=${f.id}`}
+              style={{ paddingLeft: `${8 + (depths.get(f.id) ?? 0) * 12}px` }}
+              className="flex flex-1 items-center gap-1.5 py-1.5"
+            >
+              <Folder className="size-3.5 text-muted-foreground" />
+              {f.name}
+            </Link>
+            {canEdit && (
+              <span className="opacity-0 group-hover:opacity-100">
+                <NoteFolderActions folderId={f.id} name={f.name} />
+              </span>
+            )}
+          </div>
         ))}
       </aside>
 
@@ -164,6 +175,7 @@ export default async function NotesPage({
                       Atualizada{" "}
                       {formatDistanceToNow(note.updatedAt, { addSuffix: true, locale: pt })}
                     </span>
+                    <CopyNoteContentButton content={note.content} />
                     {canEdit && (
                       <ResolveNoteButton noteId={note.id} isResolved={note.isResolved} />
                     )}

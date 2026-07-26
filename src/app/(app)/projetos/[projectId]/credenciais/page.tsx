@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getMembership } from "@/lib/project-data";
+import { getMembership, getCopyTargetProjects } from "@/lib/project-data";
 import { canViewCredentials } from "@/lib/permissions";
 import { isOwnerEmail } from "@/lib/invites";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ export default async function CredentialsPage({
     );
   }
 
-  const [credentials, members] = await Promise.all([
+  const [credentials, members, copyTargetProjects] = await Promise.all([
     prisma.credential.findMany({
       where: { projectId, ...(responsavel ? { assigneeId: responsavel } : {}) },
       orderBy: { serviceName: "asc" },
@@ -53,6 +53,7 @@ export default async function CredentialsPage({
       where: { projectId },
       include: { user: { select: { name: true, email: true } } },
     }),
+    getCopyTargetProjects(userId, projectId),
   ]);
 
   return (
@@ -94,6 +95,7 @@ export default async function CredentialsPage({
                 credential={credential}
                 members={members}
                 canDelete={isOwner || credential.createdById === userId}
+                copyTargetProjects={copyTargetProjects}
               />
             ))}
           </TableBody>

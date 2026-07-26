@@ -227,6 +227,41 @@ export async function deleteBugAction(bugId: string) {
   revalidatePath(`/projetos/${bug.projectId}/bugs`);
 }
 
+export async function copyBugToProjectAction(bugId: string, targetProjectId: string) {
+  const { bug, userId } = await requireBugAccess(bugId);
+  await requireProjectRole(userId, targetProjectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  const newBug = await prisma.$transaction(async (tx) => {
+    const project = await tx.project.update({
+      where: { id: targetProjectId },
+      data: { bugSeq: { increment: 1 } },
+    });
+
+    return tx.bug.create({
+      data: {
+        projectId: targetProjectId,
+        number: project.bugSeq,
+        title: bug.title,
+        description: bug.description,
+        priority: bug.priority,
+        reporterId: userId,
+      },
+    });
+  });
+
+  await logActivity({
+    projectId: targetProjectId,
+    userId,
+    action: "bug.copiado",
+    entityType: "bug",
+    entityId: newBug.id,
+    metadata: { title: newBug.title, fromProjectId: bug.projectId, fromBugId: bug.id },
+  });
+
+  revalidatePath(`/projetos/${targetProjectId}/bugs`);
+  return { id: newBug.id };
+}
+
 export async function updateBugPriorityAction(bugId: string, priority: Priority) {
   const { bug, membership } = await requireBugAccess(bugId);
   if (!canEditContent(membership.role)) {

@@ -7,6 +7,16 @@ export const createTaskSchema = z.object({
   priority: z.nativeEnum(Priority),
   assigneeId: z.string().optional().or(z.literal("")),
   deadline: z.string().optional().or(z.literal("")),
+  folderId: z.string().optional().or(z.literal("")),
+});
+
+export const createTaskFolderSchema = z.object({
+  name: z.string().min(1, "Nome obrigatório").max(80),
+  parentId: z.string().optional().or(z.literal("")),
+});
+
+export const renameTaskFolderSchema = z.object({
+  name: z.string().min(1, "Nome obrigatório").max(80),
 });
 
 export const updateTaskSchema = z.object({

@@ -19,16 +19,23 @@ import { PRIORITY_LABELS } from "@/components/shared/priority-badge";
 
 const initialState: TaskFormState = {};
 
+const NO_FOLDER = "__none__";
+
 type Member = { userId: string; user: { name: string | null; email: string | null } };
+type Folder = { id: string; name: string };
 
 export function TaskForm({
   projectId,
   members,
   currentUserId,
+  folders = [],
+  defaultFolderId,
 }: {
   projectId: string;
   members: Member[];
   currentUserId: string;
+  folders?: Folder[];
+  defaultFolderId?: string;
 }) {
   const action = createTaskAction.bind(null, projectId);
   const [state, formAction, isPending] = useActionState(action, initialState);
@@ -48,6 +55,29 @@ export function TaskForm({
         <Label htmlFor="description">Descrição</Label>
         <MarkdownEditor id="description" name="description" rows={6} />
       </div>
+
+      {folders.length > 0 && (
+        <div className="space-y-2">
+          <Label htmlFor="folderId">Pasta (opcional)</Label>
+          <Select
+            name="folderId"
+            items={{ [NO_FOLDER]: "Sem pasta", ...Object.fromEntries(folders.map((f) => [f.id, f.name])) }}
+            defaultValue={defaultFolderId ?? NO_FOLDER}
+          >
+            <SelectTrigger className="w-full" id="folderId">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_FOLDER}>Sem pasta</SelectItem>
+              {folders.map((f) => (
+                <SelectItem key={f.id} value={f.id}>
+                  {f.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         <div className="space-y-2">

@@ -5,14 +5,16 @@ import { toast } from "sonner";
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { BillingCycle } from "@prisma/client";
 
-import { revealCredentialAction } from "@/actions/credentials";
+import { copyCredentialToProjectAction, revealCredentialAction } from "@/actions/credentials";
 import { formatCredentialCost } from "@/components/credentials/billing-cycle";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { EditCredentialDialog } from "@/components/credentials/edit-credential-dialog";
 import { DeleteCredentialButton } from "@/components/credentials/delete-credential-button";
+import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
 
 type Member = { userId: string; user: { name: string | null; email: string | null } };
+type Project = { id: string; name: string };
 
 type Credential = {
   id: string;
@@ -39,10 +41,12 @@ export function CredentialRow({
   credential,
   members,
   canDelete,
+  copyTargetProjects,
 }: {
   credential: Credential;
   members: Member[];
   canDelete: boolean;
+  copyTargetProjects: Project[];
 }) {
   const [revealed, setRevealed] = useState<{ password: string; notes: string | null } | null>(
     null,
@@ -149,6 +153,14 @@ export function CredentialRow({
       </TableCell>
       <TableCell>
         <div className="flex gap-1">
+          <CopyToProjectDialog
+            projects={copyTargetProjects}
+            onCopy={(targetProjectId) =>
+              copyCredentialToProjectAction(credential.id, targetProjectId)
+            }
+            triggerLabel="Copiar para projeto"
+            iconOnly
+          />
           <EditCredentialDialog credential={credential} members={members} />
           {canDelete && <DeleteCredentialButton credentialId={credential.id} />}
         </div>

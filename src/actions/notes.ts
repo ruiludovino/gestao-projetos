@@ -15,7 +15,12 @@ import {
   canDeleteOwnRecord,
 } from "@/lib/permissions";
 import { sendAssignmentEmail } from "@/lib/email";
-import { createFolderSchema, createNoteSchema, updateNoteSchema } from "@/lib/validations/note";
+import {
+  createFolderSchema,
+  createNoteSchema,
+  renameFolderSchema,
+  updateNoteSchema,
+} from "@/lib/validations/note";
 
 async function requireUserId() {
   const session = await auth();
@@ -103,6 +108,26 @@ export async function createFolderAction(
   });
 
   revalidatePath(`/projetos/${projectId}/notas`);
+  return {};
+}
+
+export async function renameFolderAction(
+  folderId: string,
+  _prevState: NoteFormState,
+  formData: FormData,
+): Promise<NoteFormState> {
+  const folder = await prisma.noteFolder.findUniqueOrThrow({ where: { id: folderId } });
+  const userId = await requireUserId();
+  await requireProjectRole(userId, folder.projectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  const parsed = renameFolderSchema.safeParse({ name: formData.get("name") });
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  await prisma.noteFolder.update({ where: { id: folderId }, data: { name: parsed.data.name } });
+
+  revalidatePath(`/projetos/${folder.projectId}/notas`);
   return {};
 }
 
@@ -286,6 +311,47 @@ export async function updateNoteAssigneeAction(noteId: string, assigneeId: strin
 
   revalidatePath(`/projetos/${note.projectId}/notas/${noteId}`);
   revalidatePath(`/projetos/${note.projectId}/notas`);
+}
+
+export async function copyNoteToProjectAction(noteId: string, targetProjectId: string) {
+  const { note, userId } = await requireNoteAccess(noteId);
+  await requireProjectRole(userId, targetProjectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  const versions = await prisma.noteVersion.findMany({
+    where: { noteId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const newNote = await prisma.note.create({
+    data: {
+      projectId: targetProjectId,
+      title: note.title,
+      content: note.content,
+      createdById: userId,
+      versions: versions.length
+        ? {
+            create: versions.map((version) => ({
+              title: version.title,
+              content: version.content,
+              editedById: userId,
+              createdAt: version.createdAt,
+            })),
+          }
+        : undefined,
+    },
+  });
+
+  await logActivity({
+    projectId: targetProjectId,
+    userId,
+    action: "nota.copiada",
+    entityType: "note",
+    entityId: newNote.id,
+    metadata: { title: newNote.title, fromProjectId: note.projectId, fromNoteId: note.id },
+  });
+
+  revalidatePath(`/projetos/${targetProjectId}/notas`);
+  return { id: newNote.id };
 }
 
 export async function moveNoteToFolderAction(noteId: string, folderId: string | null) {

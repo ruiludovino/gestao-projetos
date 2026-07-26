@@ -3,7 +3,7 @@ import { pt } from "date-fns/locale";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getMembership } from "@/lib/project-data";
+import { getMembership, getCopyTargetProjects } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
 import { isOwnerEmail } from "@/lib/invites";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +17,8 @@ import { AttachmentsSection } from "@/components/bugs/attachments-section";
 import { CommentForm } from "@/components/bugs/comment-form";
 import { GithubIssueButton } from "@/components/bugs/github-issue-button";
 import { DeleteBugButton } from "@/components/bugs/delete-bug-button";
+import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
+import { copyBugToProjectAction } from "@/actions/bugs";
 
 export default async function BugDetailPage({
   params,
@@ -27,7 +29,7 @@ export default async function BugDetailPage({
   const session = await auth();
   const userId = session!.user.id;
 
-  const [membership, bug, members, allLabels] = await Promise.all([
+  const [membership, bug, members, allLabels, copyTargetProjects] = await Promise.all([
     getMembership(projectId, userId),
     prisma.bug.findUniqueOrThrow({
       where: { id: bugId },
@@ -46,6 +48,7 @@ export default async function BugDetailPage({
       include: { user: { select: { name: true, email: true } } },
     }),
     prisma.label.findMany({ where: { projectId }, orderBy: { name: "asc" } }),
+    getCopyTargetProjects(userId, projectId),
   ]);
 
   const canEdit = canEditContent(membership.role);
@@ -57,6 +60,11 @@ export default async function BugDetailPage({
       <div className="flex items-center justify-between">
         <span className="font-mono text-sm text-muted-foreground">BUG-{bug.number}</span>
         <div className="flex items-center gap-2">
+          <CopyToProjectDialog
+            projects={copyTargetProjects}
+            onCopy={(targetProjectId) => copyBugToProjectAction(bug.id, targetProjectId)}
+            triggerLabel="Copiar para projeto"
+          />
           <GithubIssueButton bugId={bug.id} githubIssueUrl={bug.githubIssueUrl} />
           {canDelete && (
             <DeleteBugButton bugId={bug.id} redirectTo={`/projetos/${projectId}/bugs`} />
