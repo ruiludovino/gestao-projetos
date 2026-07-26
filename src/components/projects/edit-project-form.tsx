@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { updateProjectAction, type ProjectFormState } from "@/actions/projects";
 import { Button } from "@/components/ui/button";
@@ -24,12 +26,25 @@ export function EditProjectForm({
   const action = updateProjectAction.bind(null, projectId);
   const [state, formAction, isPending] = useActionState(action, initialState);
   const fieldErrors = state.fieldErrors ?? {};
+  const router = useRouter();
+  const lastState = useRef(state);
+
+  useEffect(() => {
+    if (state === lastState.current) return;
+    lastState.current = state;
+    if (state.error) {
+      toast.error(state.error);
+    } else if (!state.fieldErrors) {
+      toast.success("Projeto atualizado.");
+      router.refresh();
+    }
+  }, [state, router]);
 
   return (
     <form action={formAction} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="name">Nome do projeto</Label>
-        <Input id="name" name="name" defaultValue={defaultName} required />
+        <Input key={defaultName} id="name" name="name" defaultValue={defaultName} required />
         {fieldErrors.name && (
           <p className="text-sm text-destructive">{fieldErrors.name[0]}</p>
         )}
@@ -37,6 +52,7 @@ export function EditProjectForm({
       <div className="space-y-2">
         <Label htmlFor="description">Descrição</Label>
         <Textarea
+          key={defaultDescription ?? ""}
           id="description"
           name="description"
           rows={3}
