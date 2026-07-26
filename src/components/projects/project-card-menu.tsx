@@ -5,14 +5,24 @@ import { useRouter } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
-import { deleteProjectAction, setProjectArchivedAction } from "@/actions/projects";
+import { deleteProjectAction, setProjectArchivedAction, updateProjectAction } from "@/actions/projects";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,21 +36,48 @@ import {
 
 export function ProjectCardMenu({
   projectId,
+  name,
+  description,
   archived,
   canArchive,
   canDelete,
 }: {
   projectId: string;
+  name: string;
+  description: string | null;
   archived: boolean;
   canArchive: boolean;
   canDelete: boolean;
 }) {
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [newName, setNewName] = useState(name);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   if (!canArchive && !canDelete) return null;
+
+  function handleRenameConfirm() {
+    if (!newName.trim()) return;
+    const formData = new FormData();
+    formData.set("name", newName.trim());
+    formData.set("description", description ?? "");
+    startTransition(async () => {
+      const result = await updateProjectAction(projectId, {}, formData);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+      if (result?.fieldErrors) {
+        toast.error(Object.values(result.fieldErrors)[0]?.[0] ?? "Dados inválidos.");
+        return;
+      }
+      toast.success("Projeto renomeado.");
+      setRenameOpen(false);
+      router.refresh();
+    });
+  }
 
   function handleArchiveConfirm() {
     startTransition(async () => {
@@ -79,6 +116,16 @@ export function ProjectCardMenu({
         />
         <DropdownMenuContent>
           {canArchive && (
+            <DropdownMenuItem
+              onClick={() => {
+                setNewName(name);
+                setRenameOpen(true);
+              }}
+            >
+              Renomear
+            </DropdownMenuItem>
+          )}
+          {canArchive && (
             <DropdownMenuItem onClick={() => setArchiveOpen(true)}>
               {archived ? "Remover do histórico" : "Enviar para histórico"}
             </DropdownMenuItem>
@@ -90,6 +137,29 @@ export function ProjectCardMenu({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renomear projeto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rename-project-name">Nome do projeto</Label>
+            <Input
+              id="rename-project-name"
+              value={newName}
+              onChange={(event) => setNewName(event.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline">Cancelar</Button>} />
+            <Button type="button" disabled={isPending || !newName.trim()} onClick={handleRenameConfirm}>
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
         <AlertDialogContent>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Bell, FolderKanban, LayoutDashboard, Search, User } from "lucide-react";
 
 import { auth } from "@/auth";
@@ -23,7 +24,8 @@ export async function AppSidebar() {
 
   return (
     <aside className="flex h-screen w-56 shrink-0 flex-col border-r bg-card">
-      <div className="flex h-14 items-center border-b px-4">
+      <div className="flex h-14 items-center gap-2 border-b px-4">
+        <Image src="/logo.png" alt="" width={24} height={24} className="rounded-md" />
         <span className="font-semibold tracking-tight">Gestão de Projetos</span>
       </div>
       <nav className="flex-1 space-y-1 p-2">

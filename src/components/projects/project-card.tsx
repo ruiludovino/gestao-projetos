@@ -41,6 +41,8 @@ export function ProjectCard({ project, role, canArchive, canDelete }: ProjectCar
             </span>
             <ProjectCardMenu
               projectId={project.id}
+              name={project.name}
+              description={project.description}
               archived={project.archived}
               canArchive={canArchive}
               canDelete={canDelete}
