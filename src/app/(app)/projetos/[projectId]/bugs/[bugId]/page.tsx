@@ -62,7 +62,7 @@ export default async function BugDetailPage({
         <div className="flex items-center gap-2">
           <CopyToProjectDialog
             projects={copyTargetProjects}
-            onCopy={(targetProjectId) => copyBugToProjectAction(bug.id, targetProjectId)}
+            onCopy={copyBugToProjectAction.bind(null, bug.id)}
             triggerLabel="Copiar para projeto"
           />
           <GithubIssueButton bugId={bug.id} githubIssueUrl={bug.githubIssueUrl} />

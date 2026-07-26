@@ -53,7 +53,7 @@ export default async function NoteDetailPage({
         <div className="flex items-center gap-2">
           <CopyToProjectDialog
             projects={copyTargetProjects}
-            onCopy={(targetProjectId) => copyNoteToProjectAction(note.id, targetProjectId)}
+            onCopy={copyNoteToProjectAction.bind(null, note.id)}
             triggerLabel="Copiar para projeto"
           />
           {canDelete && <DeleteNoteButton noteId={note.id} />}

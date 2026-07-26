@@ -62,7 +62,7 @@ export default async function TaskDetailPage({
         <div className="flex items-center gap-2">
           <CopyToProjectDialog
             projects={copyTargetProjects}
-            onCopy={(targetProjectId) => copyTaskToProjectAction(task.id, targetProjectId)}
+            onCopy={copyTaskToProjectAction.bind(null, task.id)}
             triggerLabel="Copiar para projeto"
           />
           {canDelete && (
