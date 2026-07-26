@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isOwnerEmail } from "@/lib/invites";
+import { canManageProject, canDeleteOwnRecord } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
 
@@ -70,7 +71,16 @@ export default async function ProjectsPage({
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {memberships.map(({ project, role }) => (
-            <ProjectCard key={project.id} project={project} role={role} />
+            <ProjectCard
+              key={project.id}
+              project={project}
+              role={role}
+              canArchive={canManageProject(role)}
+              canDelete={
+                canManageProject(role) &&
+                canDeleteOwnRecord({ isOwner, creatorId: project.createdById, userId })
+              }
+            />
           ))}
         </div>
       )}
