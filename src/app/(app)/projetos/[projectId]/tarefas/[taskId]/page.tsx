@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMembership } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
+import { isOwnerEmail } from "@/lib/invites";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { EditTaskDetailsForm } from "@/components/tasks/edit-task-details-form";
@@ -15,6 +16,7 @@ import { TaskDeadlinePicker } from "@/components/tasks/task-deadline-picker";
 import { SubtasksSection } from "@/components/tasks/subtasks-section";
 import { TaskGithubLinks } from "@/components/tasks/task-github-links";
 import { TaskCommentForm } from "@/components/tasks/task-comment-form";
+import { DeleteTaskButton } from "@/components/tasks/delete-task-button";
 
 export default async function TaskDetailPage({
   params,
@@ -45,10 +47,17 @@ export default async function TaskDetailPage({
   ]);
 
   const canEdit = canEditContent(membership.role);
+  const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
+  const canDelete = isOwner || task.createdById === userId;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <span className="font-mono text-sm text-muted-foreground">TASK-{task.number}</span>
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-sm text-muted-foreground">TASK-{task.number}</span>
+        {canDelete && (
+          <DeleteTaskButton taskId={task.id} redirectTo={`/projetos/${projectId}/tarefas/lista`} />
+        )}
+      </div>
 
       <EditTaskDetailsForm
         taskId={task.id}

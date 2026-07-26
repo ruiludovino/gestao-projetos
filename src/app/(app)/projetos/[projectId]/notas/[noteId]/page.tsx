@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMembership } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
+import { isOwnerEmail } from "@/lib/invites";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { EditNoteForm } from "@/components/notes/edit-note-form";
@@ -37,12 +38,14 @@ export default async function NoteDetailPage({
   ]);
 
   const canEdit = canEditContent(membership.role);
+  const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
+  const canDelete = isOwner || note.createdById === userId;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <PinNoteButton noteId={note.id} isPinned={note.isPinned} />
-        {canEdit && <DeleteNoteButton noteId={note.id} />}
+        {canDelete && <DeleteNoteButton noteId={note.id} />}
       </div>
 
       <div className="flex items-center gap-2">

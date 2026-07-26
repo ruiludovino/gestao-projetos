@@ -8,7 +8,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { logActivity } from "@/lib/activity";
-import { requireProjectRole } from "@/lib/permissions";
+import { requireProjectRole, isCurrentUserOwner, canDeleteOwnRecord } from "@/lib/permissions";
 import { sendProjectInviteEmail } from "@/lib/email";
 import { isOwnerEmail } from "@/lib/invites";
 import {
@@ -132,6 +132,34 @@ export async function setProjectArchivedAction(projectId: string, archived: bool
 
   revalidatePath("/projetos");
   revalidatePath(`/projetos/${projectId}`);
+}
+
+export async function deleteProjectAction(projectId: string) {
+  const userId = await requireUserId();
+  const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+  await requireProjectRole(userId, projectId, [ProjectRole.ADMIN]);
+
+  const isOwner = await isCurrentUserOwner();
+  if (!canDeleteOwnRecord({ isOwner, creatorId: project.createdById, userId })) {
+    throw new Error("Só podes apagar projetos que tu próprio criaste.");
+  }
+
+  const [bugsCount, tasksCount, notesCount, credentialsCount] = await Promise.all([
+    prisma.bug.count({ where: { projectId } }),
+    prisma.task.count({ where: { projectId } }),
+    prisma.note.count({ where: { projectId } }),
+    prisma.credential.count({ where: { projectId } }),
+  ]);
+  if (bugsCount + tasksCount + notesCount + credentialsCount > 0) {
+    throw new Error(
+      "Só podes apagar projetos sem bugs, tarefas, notas ou credenciais. Remove o conteúdo primeiro.",
+    );
+  }
+
+  await prisma.project.delete({ where: { id: projectId } });
+
+  revalidatePath("/projetos");
+  redirect("/projetos");
 }
 
 export async function addMemberAction(

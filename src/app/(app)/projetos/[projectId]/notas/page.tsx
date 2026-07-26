@@ -7,11 +7,13 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMembership } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
+import { isOwnerEmail } from "@/lib/invites";
 import { Button } from "@/components/ui/button";
 import { NotesSearch } from "@/components/notes/notes-search";
 import { CreateFolderPopover } from "@/components/notes/create-folder-popover";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { ResolveNoteButton } from "@/components/notes/resolve-note-button";
+import { DeleteNoteButton } from "@/components/notes/delete-note-button";
 import { cn } from "@/lib/utils";
 
 function buildFolderDepths(folders: { id: string; parentId: string | null }[]) {
@@ -71,6 +73,7 @@ export default async function NotesPage({
   ]);
 
   const canEdit = canEditContent(membership.role);
+  const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
   const depths = buildFolderDepths(folders);
 
   const toggleParams = new URLSearchParams();
@@ -163,6 +166,9 @@ export default async function NotesPage({
                     </span>
                     {canEdit && (
                       <ResolveNoteButton noteId={note.id} isResolved={note.isResolved} />
+                    )}
+                    {(isOwner || note.createdById === userId) && (
+                      <DeleteNoteButton noteId={note.id} />
                     )}
                   </div>
                 </Link>

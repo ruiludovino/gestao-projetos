@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMembership } from "@/lib/project-data";
 import { canViewCredentials } from "@/lib/permissions";
+import { isOwnerEmail } from "@/lib/invites";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -29,6 +30,7 @@ export default async function CredentialsPage({
   const userId = session!.user.id;
 
   const membership = await getMembership(projectId, userId);
+  const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
 
   if (!canViewCredentials(membership.role)) {
     return (
@@ -87,7 +89,12 @@ export default async function CredentialsPage({
           </TableHeader>
           <TableBody>
             {credentials.map((credential) => (
-              <CredentialRow key={credential.id} credential={credential} members={members} />
+              <CredentialRow
+                key={credential.id}
+                credential={credential}
+                members={members}
+                canDelete={isOwner || credential.createdById === userId}
+              />
             ))}
           </TableBody>
         </Table>

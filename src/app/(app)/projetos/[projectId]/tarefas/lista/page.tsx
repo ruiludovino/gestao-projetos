@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMembership } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
+import { isOwnerEmail } from "@/lib/invites";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -22,6 +23,7 @@ import { PriorityBadge } from "@/components/shared/priority-badge";
 import { TaskStatusBadge } from "@/components/shared/task-status-badge";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { ResolveTaskButton } from "@/components/tasks/resolve-task-button";
+import { DeleteTaskButton } from "@/components/tasks/delete-task-button";
 
 export default async function TasksListPage({
   params,
@@ -35,6 +37,7 @@ export default async function TasksListPage({
   const isHistory = estado === "historico";
   const session = await auth();
   const userId = session!.user.id;
+  const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
 
   const [membership, members, tasks] = await Promise.all([
     getMembership(projectId, userId),
@@ -165,7 +168,12 @@ export default async function TasksListPage({
                   </TableCell>
                   {canEditContent(membership.role) && (
                     <TableCell>
-                      <ResolveTaskButton taskId={task.id} isHistory={isHistory} />
+                      <div className="flex items-center gap-1">
+                        <ResolveTaskButton taskId={task.id} isHistory={isHistory} />
+                        {(isOwner || task.createdById === userId) && (
+                          <DeleteTaskButton taskId={task.id} size="icon-sm" />
+                        )}
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>

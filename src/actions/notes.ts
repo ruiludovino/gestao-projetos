@@ -7,7 +7,13 @@ import { NotificationType, ProjectRole } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/activity";
-import { requireProjectMembership, requireProjectRole, canEditContent } from "@/lib/permissions";
+import {
+  requireProjectMembership,
+  requireProjectRole,
+  canEditContent,
+  isCurrentUserOwner,
+  canDeleteOwnRecord,
+} from "@/lib/permissions";
 import { sendAssignmentEmail } from "@/lib/email";
 import { createFolderSchema, createNoteSchema, updateNoteSchema } from "@/lib/validations/note";
 
@@ -203,9 +209,10 @@ export async function updateNoteAction(
 }
 
 export async function deleteNoteAction(noteId: string) {
-  const { note, membership } = await requireNoteAccess(noteId);
-  if (!canEditContent(membership.role)) {
-    throw new Error("Não tens permissão para remover esta nota.");
+  const { note, userId } = await requireNoteAccess(noteId);
+  const isOwner = await isCurrentUserOwner();
+  if (!canDeleteOwnRecord({ isOwner, creatorId: note.createdById, userId })) {
+    throw new Error("Só podes apagar notas que tu próprio criaste.");
   }
 
   await prisma.note.delete({ where: { id: noteId } });

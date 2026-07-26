@@ -7,7 +7,13 @@ import { NotificationType, Priority, ProjectRole, TaskStatus } from "@prisma/cli
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/activity";
-import { requireProjectMembership, requireProjectRole, canEditContent } from "@/lib/permissions";
+import {
+  requireProjectMembership,
+  requireProjectRole,
+  canEditContent,
+  isCurrentUserOwner,
+  canDeleteOwnRecord,
+} from "@/lib/permissions";
 import { sendAssignmentEmail } from "@/lib/email";
 import {
   createTaskSchema,
@@ -206,6 +212,28 @@ export async function setTaskStatusAction(taskId: string, status: TaskStatus) {
   revalidatePath(`/projetos/${task.projectId}/tarefas`);
   revalidatePath(`/projetos/${task.projectId}/tarefas/lista`);
   revalidatePath(`/projetos/${task.projectId}/tarefas/${taskId}`);
+}
+
+export async function deleteTaskAction(taskId: string) {
+  const { task, userId } = await requireTaskAccess(taskId);
+  const isOwner = await isCurrentUserOwner();
+  if (!canDeleteOwnRecord({ isOwner, creatorId: task.createdById, userId })) {
+    throw new Error("Só podes apagar tarefas que tu próprio criaste.");
+  }
+
+  await prisma.task.delete({ where: { id: taskId } });
+
+  await logActivity({
+    projectId: task.projectId,
+    userId,
+    action: "tarefa.removida",
+    entityType: "task",
+    entityId: taskId,
+    metadata: { title: task.title },
+  });
+
+  revalidatePath(`/projetos/${task.projectId}/tarefas`);
+  revalidatePath(`/projetos/${task.projectId}/tarefas/lista`);
 }
 
 export async function updateTaskPriorityAction(taskId: string, priority: Priority) {

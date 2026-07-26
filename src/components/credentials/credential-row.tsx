@@ -38,9 +38,11 @@ export async function copyToClipboard(value: string, label: string) {
 export function CredentialRow({
   credential,
   members,
+  canDelete,
 }: {
   credential: Credential;
   members: Member[];
+  canDelete: boolean;
 }) {
   const [revealed, setRevealed] = useState<{ password: string; notes: string | null } | null>(
     null,
@@ -148,7 +150,7 @@ export function CredentialRow({
       <TableCell>
         <div className="flex gap-1">
           <EditCredentialDialog credential={credential} members={members} />
-          <DeleteCredentialButton credentialId={credential.id} />
+          {canDelete && <DeleteCredentialButton credentialId={credential.id} />}
         </div>
       </TableCell>
     </TableRow>

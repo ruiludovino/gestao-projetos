@@ -9,7 +9,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { logActivity } from "@/lib/activity";
-import { requireProjectMembership, canViewCredentials } from "@/lib/permissions";
+import {
+  requireProjectMembership,
+  canViewCredentials,
+  isCurrentUserOwner,
+  canDeleteOwnRecord,
+} from "@/lib/permissions";
 import { sendAssignmentEmail } from "@/lib/email";
 import { createCredentialSchema, updateCredentialSchema } from "@/lib/validations/credential";
 
@@ -229,6 +234,10 @@ export async function updateCredentialAction(
 export async function deleteCredentialAction(credentialId: string) {
   const credential = await prisma.credential.findUniqueOrThrow({ where: { id: credentialId } });
   const { userId } = await requireCredentialsAccess(credential.projectId);
+  const isOwner = await isCurrentUserOwner();
+  if (!canDeleteOwnRecord({ isOwner, creatorId: credential.createdById, userId })) {
+    throw new Error("Só podes apagar credenciais que tu próprio criaste.");
+  }
 
   await prisma.credential.delete({ where: { id: credentialId } });
 

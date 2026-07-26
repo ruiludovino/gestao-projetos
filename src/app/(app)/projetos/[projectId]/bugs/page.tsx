@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMembership } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
+import { isOwnerEmail } from "@/lib/invites";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -20,6 +21,7 @@ import { PriorityBadge } from "@/components/shared/priority-badge";
 import { BugStatusBadge } from "@/components/shared/bug-status-badge";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { ResolveBugButton } from "@/components/bugs/resolve-bug-button";
+import { DeleteBugButton } from "@/components/bugs/delete-bug-button";
 
 const RESOLVED_STATUSES: BugStatus[] = [BugStatus.RESOLVIDO, BugStatus.FECHADO];
 
@@ -35,6 +37,7 @@ export default async function BugsPage({
   const isHistory = estado === "historico";
   const session = await auth();
   const userId = session!.user.id;
+  const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
 
   const [membership, members, bugs] = await Promise.all([
     getMembership(projectId, userId),
@@ -166,7 +169,12 @@ export default async function BugsPage({
                   </TableCell>
                   {canEditContent(membership.role) && (
                     <TableCell>
-                      <ResolveBugButton bugId={bug.id} isHistory={isHistory} />
+                      <div className="flex items-center gap-1">
+                        <ResolveBugButton bugId={bug.id} isHistory={isHistory} />
+                        {(isOwner || bug.reporterId === userId) && (
+                          <DeleteBugButton bugId={bug.id} size="icon-sm" />
+                        )}
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>

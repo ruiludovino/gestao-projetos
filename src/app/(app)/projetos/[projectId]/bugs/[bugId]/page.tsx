@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMembership } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
+import { isOwnerEmail } from "@/lib/invites";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { EditBugDetailsForm } from "@/components/bugs/edit-bug-details-form";
@@ -15,6 +16,7 @@ import { BugLabelsEditor } from "@/components/bugs/bug-labels-editor";
 import { AttachmentsSection } from "@/components/bugs/attachments-section";
 import { CommentForm } from "@/components/bugs/comment-form";
 import { GithubIssueButton } from "@/components/bugs/github-issue-button";
+import { DeleteBugButton } from "@/components/bugs/delete-bug-button";
 
 export default async function BugDetailPage({
   params,
@@ -47,12 +49,19 @@ export default async function BugDetailPage({
   ]);
 
   const canEdit = canEditContent(membership.role);
+  const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
+  const canDelete = isOwner || bug.reporterId === userId;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <span className="font-mono text-sm text-muted-foreground">BUG-{bug.number}</span>
-        <GithubIssueButton bugId={bug.id} githubIssueUrl={bug.githubIssueUrl} />
+        <div className="flex items-center gap-2">
+          <GithubIssueButton bugId={bug.id} githubIssueUrl={bug.githubIssueUrl} />
+          {canDelete && (
+            <DeleteBugButton bugId={bug.id} redirectTo={`/projetos/${projectId}/bugs`} />
+          )}
+        </div>
       </div>
 
       <EditBugDetailsForm

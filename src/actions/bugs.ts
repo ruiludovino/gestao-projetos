@@ -8,7 +8,13 @@ import { BugStatus, NotificationType, Priority, ProjectRole } from "@prisma/clie
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/activity";
-import { requireProjectMembership, requireProjectRole, canEditContent } from "@/lib/permissions";
+import {
+  requireProjectMembership,
+  requireProjectRole,
+  canEditContent,
+  isCurrentUserOwner,
+  canDeleteOwnRecord,
+} from "@/lib/permissions";
 import { createGithubIssue } from "@/lib/github";
 import { sendAssignmentEmail } from "@/lib/email";
 import {
@@ -197,6 +203,27 @@ export async function updateBugStatusAction(bugId: string, status: BugStatus) {
   });
 
   revalidatePath(`/projetos/${bug.projectId}/bugs/${bugId}`);
+  revalidatePath(`/projetos/${bug.projectId}/bugs`);
+}
+
+export async function deleteBugAction(bugId: string) {
+  const { bug, userId } = await requireBugAccess(bugId);
+  const isOwner = await isCurrentUserOwner();
+  if (!canDeleteOwnRecord({ isOwner, creatorId: bug.reporterId, userId })) {
+    throw new Error("Só podes apagar bugs que tu próprio reportaste.");
+  }
+
+  await prisma.bug.delete({ where: { id: bugId } });
+
+  await logActivity({
+    projectId: bug.projectId,
+    userId,
+    action: "bug.removido",
+    entityType: "bug",
+    entityId: bugId,
+    metadata: { title: bug.title },
+  });
+
   revalidatePath(`/projetos/${bug.projectId}/bugs`);
 }
 

@@ -2,6 +2,8 @@ import "server-only";
 
 import { ProjectRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { isOwnerEmail } from "@/lib/invites";
 
 export class ForbiddenError extends Error {
   constructor(message = "Não tens permissão para esta ação.") {
@@ -46,3 +48,18 @@ export const canViewCredentials = (role: ProjectRole) =>
 // VIEWER e so leitura em bugs/tarefas/notas.
 export const canEditContent = (role: ProjectRole) =>
   role === ProjectRole.ADMIN || role === ProjectRole.DEVELOPER;
+
+// O dono da conta (OWNER_EMAILS) pode apagar qualquer registo; os restantes
+// utilizadores so podem apagar o que eles proprios criaram.
+export async function isCurrentUserOwner(): Promise<boolean> {
+  const session = await auth();
+  return !!session?.user?.email && isOwnerEmail(session.user.email);
+}
+
+export function canDeleteOwnRecord(params: {
+  isOwner: boolean;
+  creatorId: string | null;
+  userId: string;
+}): boolean {
+  return params.isOwner || params.creatorId === params.userId;
+}
