@@ -33,7 +33,7 @@ export function ArchiveProjectButton({
     startTransition(async () => {
       try {
         await setProjectArchivedAction(projectId, !archived);
-        toast.success(archived ? "Projeto reativado." : "Projeto arquivado.");
+        toast.success(archived ? "Projeto removido do histórico." : "Projeto enviado para o histórico.");
         setOpen(false);
         router.refresh();
       } catch (error) {
@@ -47,19 +47,19 @@ export function ArchiveProjectButton({
       <AlertDialogTrigger
         render={
           <Button variant={archived ? "outline" : "destructive"} disabled={isPending}>
-            {archived ? "Reativar projeto" : "Arquivar projeto"}
+            {archived ? "Remover do histórico" : "Enviar para histórico"}
           </Button>
         }
       />
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {archived ? "Reativar este projeto?" : "Arquivar este projeto?"}
+            {archived ? "Remover este projeto do histórico?" : "Enviar este projeto para o histórico?"}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {archived
               ? "O projeto volta a aparecer como ativo para todos os membros."
-              : "O projeto deixa de aparecer como ativo, mas os dados não são apagados."}
+              : "O projeto passa a aparecer no histórico em vez de ativo, mas os dados não são apagados."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

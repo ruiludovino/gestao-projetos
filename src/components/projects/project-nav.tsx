@@ -24,6 +24,7 @@ export function ProjectNav({ projectId, showCredentials, showSettings }: Project
       : []),
     { href: `${base}/notas`, label: "Notas" },
     { href: `${base}/rotas`, label: "Rotas Da Aplicação" },
+    { href: `${base}/regras`, label: "Regras" },
     { href: `${base}/github`, label: "GitHub" },
     ...(showSettings ? [{ href: `${base}/definicoes`, label: "Definições" }] : []),
   ];

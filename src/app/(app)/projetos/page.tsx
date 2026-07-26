@@ -7,13 +7,19 @@ import { isOwnerEmail } from "@/lib/invites";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ estado?: string }>;
+}) {
+  const { estado } = await searchParams;
+  const isHistory = estado === "historico";
   const session = await auth();
   const userId = session!.user.id;
   const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
 
   const memberships = await prisma.projectMember.findMany({
-    where: { userId },
+    where: { userId, project: { archived: isHistory } },
     include: {
       project: {
         include: { _count: { select: { members: true, bugs: true, tasks: true } } },
@@ -22,11 +28,18 @@ export default async function ProjectsPage() {
     orderBy: { project: { updatedAt: "desc" } },
   });
 
+  const toggleHref = isHistory ? "/projetos" : "/projetos?estado=historico";
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Projetos</h1>
-        {isOwner && (
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight">Projetos</h1>
+          <Link href={toggleHref} className="text-sm text-muted-foreground hover:underline">
+            {isHistory ? "Ver ativos" : "Ver histórico"}
+          </Link>
+        </div>
+        {isOwner && !isHistory && (
           <Button
             render={
               <Link href="/projetos/novo">
@@ -40,7 +53,9 @@ export default async function ProjectsPage() {
 
       {memberships.length === 0 ? (
         <p className="text-muted-foreground">
-          {isOwner ? (
+          {isHistory ? (
+            "Ainda não há projetos no histórico."
+          ) : isOwner ? (
             <>
               Ainda não pertences a nenhum projeto.{" "}
               <Link href="/projetos/novo" className="underline underline-offset-4">
