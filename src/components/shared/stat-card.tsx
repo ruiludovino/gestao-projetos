@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 
-export function StatCard({ label, value }: { label: string; value: number }) {
+export function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
     <Card>
       <CardContent className="pt-6">
