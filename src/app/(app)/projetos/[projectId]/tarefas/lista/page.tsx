@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Folder } from "lucide-react";
+import { Plus } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { TaskStatus } from "@prisma/client";
@@ -24,22 +24,7 @@ import { TaskStatusBadge } from "@/components/shared/task-status-badge";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { ResolveTaskButton } from "@/components/tasks/resolve-task-button";
 import { DeleteTaskButton } from "@/components/tasks/delete-task-button";
-import { CreateFolderPopover } from "@/components/tasks/create-folder-popover";
-import { TaskFolderActions } from "@/components/tasks/task-folder-actions";
-import { cn } from "@/lib/utils";
-
-function buildFolderDepths(folders: { id: string; parentId: string | null }[]) {
-  const depthById = new Map<string, number>();
-  function depthOf(id: string): number {
-    if (depthById.has(id)) return depthById.get(id)!;
-    const folder = folders.find((f) => f.id === id);
-    const depth = folder?.parentId ? depthOf(folder.parentId) + 1 : 0;
-    depthById.set(id, depth);
-    return depth;
-  }
-  for (const folder of folders) depthOf(folder.id);
-  return depthById;
-}
+import { FolderMenu } from "@/components/tasks/folder-menu";
 
 export default async function TasksListPage({
   params,
@@ -79,7 +64,6 @@ export default async function TasksListPage({
   ]);
 
   const canEdit = canEditContent(membership.role);
-  const depths = buildFolderDepths(folders);
 
   const toggleParams = new URLSearchParams();
   if (!isHistory) toggleParams.set("estado", "historico");
@@ -88,51 +72,23 @@ export default async function TasksListPage({
   const toggleQuery = toggleParams.toString();
   const toggleHref = `/projetos/${projectId}/tarefas/lista${toggleQuery ? `?${toggleQuery}` : ""}`;
 
-  return (
-    <div className="flex gap-8">
-      <aside className="w-56 shrink-0 space-y-1">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">Pastas</span>
-          {canEdit && <CreateFolderPopover projectId={projectId} />}
-        </div>
-        <Link
-          href={`/projetos/${projectId}/tarefas/lista`}
-          className={cn(
-            "block rounded-md px-2 py-1.5 text-sm hover:bg-accent",
-            !folder && "bg-accent font-medium",
-          )}
-        >
-          Todas as tarefas
-        </Link>
-        {folders.map((f) => (
-          <div
-            key={f.id}
-            className={cn(
-              "group flex items-center justify-between rounded-md pr-1 text-sm hover:bg-accent",
-              folder === f.id && "bg-accent font-medium",
-            )}
-          >
-            <Link
-              href={`/projetos/${projectId}/tarefas/lista?folder=${f.id}`}
-              style={{ paddingLeft: `${8 + (depths.get(f.id) ?? 0) * 12}px` }}
-              className="flex flex-1 items-center gap-1.5 py-1.5"
-            >
-              <Folder className="size-3.5 text-muted-foreground" />
-              {f.name}
-            </Link>
-            {canEdit && (
-              <span className="opacity-0 group-hover:opacity-100">
-                <TaskFolderActions folderId={f.id} name={f.name} />
-              </span>
-            )}
-          </div>
-        ))}
-      </aside>
+  const folderExtraParams: Record<string, string> = {};
+  if (isHistory) folderExtraParams.estado = "historico";
+  if (responsavel) folderExtraParams.responsavel = responsavel;
 
-      <div className="flex-1">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+  return (
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-xl font-semibold tracking-tight">Tarefas</h1>
+          <FolderMenu
+            projectId={projectId}
+            basePath={`/projetos/${projectId}/tarefas/lista`}
+            folders={folders}
+            currentFolderId={folder}
+            canEdit={canEdit}
+            extraParams={folderExtraParams}
+          />
           <Link
             href={`/projetos/${projectId}/tarefas${folder ? `?folder=${folder}` : ""}`}
             className="text-sm text-muted-foreground hover:underline"
@@ -244,7 +200,6 @@ export default async function TasksListPage({
           </TableBody>
         </Table>
       )}
-      </div>
     </div>
   );
 }

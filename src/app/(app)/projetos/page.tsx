@@ -70,11 +70,12 @@ export default async function ProjectsPage({
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {memberships.map(({ project, role }) => (
+          {memberships.map(({ project, role, pinned }) => (
             <ProjectCard
               key={project.id}
               project={project}
               role={role}
+              pinned={pinned}
               canArchive={canManageProject(role)}
               canDelete={
                 canManageProject(role) &&

@@ -8,7 +8,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { logActivity } from "@/lib/activity";
-import { requireProjectRole, isCurrentUserOwner, canDeleteOwnRecord } from "@/lib/permissions";
+import {
+  requireProjectRole,
+  requireProjectMembership,
+  isCurrentUserOwner,
+  canDeleteOwnRecord,
+} from "@/lib/permissions";
 import { sendProjectInviteEmail } from "@/lib/email";
 import { isOwnerEmail } from "@/lib/invites";
 import {
@@ -280,6 +285,18 @@ export async function removeMemberAction(projectId: string, targetUserId: string
   });
 
   revalidatePath(`/projetos/${projectId}/definicoes`);
+}
+
+export async function toggleProjectPinAction(projectId: string) {
+  const userId = await requireUserId();
+  const membership = await requireProjectMembership(userId, projectId);
+
+  await prisma.projectMember.update({
+    where: { projectId_userId: { projectId, userId } },
+    data: { pinned: !membership.pinned },
+  });
+
+  revalidatePath("/", "layout");
 }
 
 export async function updateMemberRoleAction(

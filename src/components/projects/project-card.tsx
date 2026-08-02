@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ProjectRole } from "@prisma/client";
+import { Pin } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +16,12 @@ type ProjectCardProps = {
     _count: { members: number; bugs: number; tasks: number };
   };
   role: ProjectRole;
+  pinned: boolean;
   canArchive: boolean;
   canDelete: boolean;
 };
 
-export function ProjectCard({ project, role, canArchive, canDelete }: ProjectCardProps) {
+export function ProjectCard({ project, role, pinned, canArchive, canDelete }: ProjectCardProps) {
   return (
     <Card className="relative h-full transition-colors hover:border-foreground/30">
       <Link
@@ -29,7 +31,10 @@ export function ProjectCard({ project, role, canArchive, canDelete }: ProjectCar
       />
       <CardHeader className="relative z-10">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="pointer-events-none text-base">{project.name}</CardTitle>
+          <CardTitle className="flex items-center gap-1.5 pointer-events-none text-base">
+            {pinned && <Pin className="size-3.5 fill-primary text-primary" />}
+            {project.name}
+          </CardTitle>
           <div className="flex items-center gap-1">
             {project.archived && (
               <Badge variant="secondary" className="pointer-events-none">
@@ -44,6 +49,7 @@ export function ProjectCard({ project, role, canArchive, canDelete }: ProjectCar
               name={project.name}
               description={project.description}
               archived={project.archived}
+              pinned={pinned}
               canArchive={canArchive}
               canDelete={canDelete}
             />

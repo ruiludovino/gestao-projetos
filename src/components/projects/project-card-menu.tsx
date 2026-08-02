@@ -2,10 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Pin, PinOff } from "lucide-react";
 import { toast } from "sonner";
 
-import { deleteProjectAction, setProjectArchivedAction, updateProjectAction } from "@/actions/projects";
+import {
+  deleteProjectAction,
+  setProjectArchivedAction,
+  toggleProjectPinAction,
+  updateProjectAction,
+} from "@/actions/projects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +44,7 @@ export function ProjectCardMenu({
   name,
   description,
   archived,
+  pinned,
   canArchive,
   canDelete,
 }: {
@@ -46,6 +52,7 @@ export function ProjectCardMenu({
   name: string;
   description: string | null;
   archived: boolean;
+  pinned: boolean;
   canArchive: boolean;
   canDelete: boolean;
 }) {
@@ -56,7 +63,13 @@ export function ProjectCardMenu({
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  if (!canArchive && !canDelete) return null;
+  function handleTogglePin() {
+    startTransition(async () => {
+      await toggleProjectPinAction(projectId);
+      toast.success(pinned ? "Projeto desafixado." : "Projeto fixado na barra lateral.");
+      router.refresh();
+    });
+  }
 
   function handleRenameConfirm() {
     if (!newName.trim()) return;
@@ -115,6 +128,19 @@ export function ProjectCardMenu({
           }
         />
         <DropdownMenuContent>
+          <DropdownMenuItem onClick={handleTogglePin} disabled={isPending}>
+            {pinned ? (
+              <>
+                <PinOff className="size-4" />
+                Desafixar
+              </>
+            ) : (
+              <>
+                <Pin className="size-4" />
+                Fixar na barra lateral
+              </>
+            )}
+          </DropdownMenuItem>
           {canArchive && (
             <DropdownMenuItem
               onClick={() => {

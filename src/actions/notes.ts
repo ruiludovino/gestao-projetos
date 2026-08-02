@@ -192,7 +192,7 @@ export async function createNoteAction(
   }
 
   revalidatePath(`/projetos/${projectId}/notas`);
-  redirect(`/projetos/${projectId}/notas/${note.id}`);
+  redirect(`/projetos/${projectId}/notas`);
 }
 
 export async function updateNoteAction(

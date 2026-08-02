@@ -49,7 +49,7 @@ export async function createRuleAction(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const rule = await prisma.rule.create({
+  await prisma.rule.create({
     data: {
       projectId,
       title: parsed.data.title,
@@ -59,7 +59,7 @@ export async function createRuleAction(
   });
 
   revalidatePath(`/projetos/${projectId}/regras`);
-  redirect(`/projetos/${projectId}/regras/${rule.id}`);
+  redirect(`/projetos/${projectId}/regras`);
 }
 
 export async function updateRuleAction(

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { ProjectRole } from "@prisma/client";
 
 import { auth } from "@/auth";
@@ -53,7 +54,7 @@ export async function createAppRouteAction(
   });
 
   revalidatePath(`/projetos/${projectId}/rotas`);
-  return {};
+  redirect(`/projetos/${projectId}/rotas`);
 }
 
 export async function updateAppRouteAction(

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Lock, Plus } from "lucide-react";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -59,7 +59,13 @@ export default async function CredentialsPage({
   return (
     <div>
       <div className="mb-6 flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold tracking-tight">Credenciais / Plataformas</h1>
+        <div className="flex items-center gap-2">
+          <Lock className="size-4 text-amber-500" />
+          <h1 className="text-xl font-semibold tracking-tight">Cofre de Credenciais</h1>
+          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+            Apenas Admin/Developer
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <AssigneeFilter members={members} />
           <Button
