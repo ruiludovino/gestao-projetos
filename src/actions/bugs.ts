@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { put, del } from "@vercel/blob";
 import { BugStatus, NotificationType, Priority, ProjectRole } from "@prisma/client";
 
@@ -74,7 +74,8 @@ async function requireUserId() {
 
 async function requireBugAccess(bugId: string) {
   const userId = await requireUserId();
-  const bug = await prisma.bug.findUniqueOrThrow({ where: { id: bugId } });
+  const bug = await prisma.bug.findUnique({ where: { id: bugId } });
+  if (!bug) notFound();
   const membership = await requireProjectMembership(userId, bug.projectId);
   return { userId, bug, membership };
 }
@@ -150,7 +151,7 @@ export async function createBugAction(
   }
 
   revalidatePath(`/projetos/${projectId}/bugs`);
-  redirect(`/projetos/${projectId}/bugs/${bug.id}`);
+  redirect(`/projetos/${projectId}/bugs`);
 }
 
 export async function updateBugDetailsAction(

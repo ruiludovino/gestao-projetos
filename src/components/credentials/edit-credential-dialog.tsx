@@ -47,11 +47,18 @@ type Credential = {
 export function EditCredentialDialog({
   credential,
   members,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+  hideTrigger = false,
 }: {
   credential: Credential;
   members: Member[];
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
   const [notes, setNotes] = useState("");
   const [currentPassword, setCurrentPassword] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -60,7 +67,7 @@ export function EditCredentialDialog({
   const [isPending, startTransition] = useTransition();
 
   function handleOpenChange(next: boolean) {
-    setOpen(next);
+    onOpenChangeProp ? onOpenChangeProp(next) : setOpenState(next);
     setError(null);
     if (next) {
       setPasswordVisible(false);
@@ -88,19 +95,26 @@ export function EditCredentialDialog({
         return;
       }
       toast.success("Credencial atualizada.");
-      setOpen(false);
+      handleOpenChange(false);
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        render={
-          <Button variant="ghost" size="icon-sm" aria-label="Editar credencial">
-            <Pencil className="size-3.5" />
-          </Button>
-        }
-      />
+      {!hideTrigger && (
+        <DialogTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Editar credencial"
+              onClick={(event: React.MouseEvent) => event.stopPropagation()}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          }
+        />
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Editar credencial</DialogTitle>

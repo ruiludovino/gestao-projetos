@@ -1,5 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { pt } from "date-fns/locale";
+import { notFound } from "next/navigation";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -31,7 +32,7 @@ export default async function BugDetailPage({
 
   const [membership, bug, members, allLabels, copyTargetProjects] = await Promise.all([
     getMembership(projectId, userId),
-    prisma.bug.findUniqueOrThrow({
+    prisma.bug.findUnique({
       where: { id: bugId },
       include: {
         reporter: { select: { name: true, email: true, image: true } },
@@ -50,6 +51,7 @@ export default async function BugDetailPage({
     prisma.label.findMany({ where: { projectId }, orderBy: { name: "asc" } }),
     getCopyTargetProjects(userId, projectId),
   ]);
+  if (!bug) notFound();
 
   const canEdit = canEditContent(membership.role);
   const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);

@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/table";
 import { CredentialRow } from "@/components/credentials/credential-row";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
+import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
+import { copyAllCredentialsToProjectAction } from "@/actions/credentials";
 
 export default async function CredentialsPage({
   params,
@@ -68,6 +70,13 @@ export default async function CredentialsPage({
         </div>
         <div className="flex items-center gap-2">
           <AssigneeFilter members={members} />
+          {credentials.length > 0 && copyTargetProjects.length > 0 && (
+            <CopyToProjectDialog
+              projects={copyTargetProjects}
+              onCopy={copyAllCredentialsToProjectAction.bind(null, projectId)}
+              triggerLabel="Copiar todas para outro projeto"
+            />
+          )}
           <Button
             render={
               <Link href={`/projetos/${projectId}/credenciais/novo`}>

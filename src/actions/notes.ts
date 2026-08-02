@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { NotificationType, ProjectRole } from "@prisma/client";
 
 import { auth } from "@/auth";
@@ -30,7 +30,8 @@ async function requireUserId() {
 
 async function requireNoteAccess(noteId: string) {
   const userId = await requireUserId();
-  const note = await prisma.note.findUniqueOrThrow({ where: { id: noteId } });
+  const note = await prisma.note.findUnique({ where: { id: noteId } });
+  if (!note) notFound();
   const membership = await requireProjectMembership(userId, note.projectId);
   return { userId, note, membership };
 }

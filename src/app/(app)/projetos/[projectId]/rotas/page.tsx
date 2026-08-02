@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getMembership } from "@/lib/project-data";
+import { getMembership, getCopyTargetProjects } from "@/lib/project-data";
 import { canEditContent, isCurrentUserOwner } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/table";
 import { EditAppRouteDialog } from "@/components/app-routes/edit-app-route-dialog";
 import { DeleteAppRouteButton } from "@/components/app-routes/delete-app-route-button";
+import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
+import { copyAppRouteToProjectAction, copyAllAppRoutesToProjectAction } from "@/actions/app-routes";
 
 export default async function AppRoutesPage({
   params,
@@ -26,7 +28,7 @@ export default async function AppRoutesPage({
   const session = await auth();
   const userId = session!.user.id;
 
-  const [membership, isOwner, routes] = await Promise.all([
+  const [membership, isOwner, routes, copyTargetProjects] = await Promise.all([
     getMembership(projectId, userId),
     isCurrentUserOwner(),
     prisma.appRoute.findMany({
@@ -34,6 +36,7 @@ export default async function AppRoutesPage({
       orderBy: { createdAt: "asc" },
       include: { createdBy: { select: { name: true, email: true } } },
     }),
+    getCopyTargetProjects(userId, projectId),
   ]);
 
   const canEdit = canEditContent(membership.role);
@@ -42,16 +45,25 @@ export default async function AppRoutesPage({
     <div>
       <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold tracking-tight">Rotas da Aplicação</h1>
-        {canEdit && (
-          <Button
-            render={
-              <Link href={`/projetos/${projectId}/rotas/nova`}>
-                <Plus className="size-4" />
-                Nova rota
-              </Link>
-            }
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {canEdit && routes.length > 0 && copyTargetProjects.length > 0 && (
+            <CopyToProjectDialog
+              projects={copyTargetProjects}
+              onCopy={copyAllAppRoutesToProjectAction.bind(null, projectId)}
+              triggerLabel="Copiar todas para outro projeto"
+            />
+          )}
+          {canEdit && (
+            <Button
+              render={
+                <Link href={`/projetos/${projectId}/rotas/nova`}>
+                  <Plus className="size-4" />
+                  Nova rota
+                </Link>
+              }
+            />
+          )}
+        </div>
       </div>
 
       {routes.length === 0 ? (
@@ -95,6 +107,12 @@ export default async function AppRoutesPage({
                   <TableCell>
                     <div className="flex gap-1">
                       <EditAppRouteDialog route={route} />
+                      <CopyToProjectDialog
+                        projects={copyTargetProjects}
+                        onCopy={copyAppRouteToProjectAction.bind(null, route.id)}
+                        triggerLabel="Copiar para projeto"
+                        iconOnly
+                      />
                       {(isOwner || route.createdById === userId) && (
                         <DeleteAppRouteButton routeId={route.id} />
                       )}

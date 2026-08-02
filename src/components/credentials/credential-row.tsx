@@ -51,6 +51,7 @@ export function CredentialRow({
   const [revealed, setRevealed] = useState<{ password: string; notes: string | null } | null>(
     null,
   );
+  const [editOpen, setEditOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function handleToggleReveal() {
@@ -84,7 +85,10 @@ export function CredentialRow({
   }
 
   return (
-    <TableRow>
+    <TableRow
+      className="cursor-pointer"
+      onClick={() => setEditOpen(true)}
+    >
       <TableCell>
         <p className="font-medium">{credential.serviceName}</p>
         {credential.url && (
@@ -105,7 +109,10 @@ export function CredentialRow({
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={() => copyToClipboard(credential.username!, "Username")}
+              onClick={(event) => {
+                event.stopPropagation();
+                copyToClipboard(credential.username!, "Username");
+              }}
               aria-label="Copiar username"
             >
               <Copy className="size-3.5" />
@@ -122,7 +129,10 @@ export function CredentialRow({
             variant="ghost"
             size="icon-sm"
             disabled={isPending}
-            onClick={handleToggleReveal}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleToggleReveal();
+            }}
             aria-label={revealed ? "Esconder password" : "Mostrar password"}
           >
             {revealed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
@@ -131,7 +141,10 @@ export function CredentialRow({
             variant="ghost"
             size="icon-sm"
             disabled={isPending}
-            onClick={handleCopyPassword}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleCopyPassword();
+            }}
             aria-label="Copiar password"
           >
             <Copy className="size-3.5" />
@@ -161,7 +174,12 @@ export function CredentialRow({
             triggerLabel="Copiar para projeto"
             iconOnly
           />
-          <EditCredentialDialog credential={credential} members={members} />
+          <EditCredentialDialog
+            credential={credential}
+            members={members}
+            open={editOpen}
+            onOpenChange={setEditOpen}
+          />
           {canDelete && <DeleteCredentialButton credentialId={credential.id} />}
         </div>
       </TableCell>

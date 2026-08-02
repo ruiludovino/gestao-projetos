@@ -38,7 +38,12 @@ export function DeleteCredentialButton({ credentialId }: { credentialId: string 
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger
         render={
-          <Button variant="ghost" size="icon-sm" aria-label="Remover credencial">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Remover credencial"
+            onClick={(event: React.MouseEvent) => event.stopPropagation()}
+          >
             <Trash2 className="size-3.5" />
           </Button>
         }

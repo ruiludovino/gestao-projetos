@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { ProjectRole } from "@prisma/client";
 
 import { auth } from "@/auth";
@@ -13,6 +13,7 @@ import {
   isCurrentUserOwner,
   canDeleteOwnRecord,
 } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity";
 import { createAppRouteSchema, updateAppRouteSchema } from "@/lib/validations/app-route";
 
 async function requireUserId() {
@@ -62,7 +63,8 @@ export async function updateAppRouteAction(
   _prevState: AppRouteFormState,
   formData: FormData,
 ): Promise<AppRouteFormState> {
-  const route = await prisma.appRoute.findUniqueOrThrow({ where: { id: routeId } });
+  const route = await prisma.appRoute.findUnique({ where: { id: routeId } });
+  if (!route) notFound();
   const userId = await requireUserId();
   const membership = await requireProjectMembership(userId, route.projectId);
   if (!canEditContent(membership.role)) {
@@ -91,8 +93,70 @@ export async function updateAppRouteAction(
   return {};
 }
 
+export async function copyAppRouteToProjectAction(routeId: string, targetProjectId: string) {
+  const route = await prisma.appRoute.findUnique({ where: { id: routeId } });
+  if (!route) notFound();
+  const userId = await requireUserId();
+  await requireProjectMembership(userId, route.projectId);
+  await requireProjectRole(userId, targetProjectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  const newRoute = await prisma.appRoute.create({
+    data: {
+      projectId: targetProjectId,
+      description: route.description,
+      link: route.link,
+      notes: route.notes,
+      createdById: userId,
+    },
+  });
+
+  await logActivity({
+    projectId: targetProjectId,
+    userId,
+    action: "rota.copiada",
+    entityType: "appRoute",
+    entityId: newRoute.id,
+    metadata: { description: newRoute.description, fromProjectId: route.projectId, fromRouteId: route.id },
+  });
+
+  revalidatePath(`/projetos/${targetProjectId}/rotas`);
+  return { id: newRoute.id };
+}
+
+export async function copyAllAppRoutesToProjectAction(projectId: string, targetProjectId: string) {
+  const userId = await requireUserId();
+  await requireProjectMembership(userId, projectId);
+  await requireProjectRole(userId, targetProjectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  const routes = await prisma.appRoute.findMany({ where: { projectId } });
+  if (routes.length === 0) return { copied: 0 };
+
+  await prisma.appRoute.createMany({
+    data: routes.map((route) => ({
+      projectId: targetProjectId,
+      description: route.description,
+      link: route.link,
+      notes: route.notes,
+      createdById: userId,
+    })),
+  });
+
+  await logActivity({
+    projectId: targetProjectId,
+    userId,
+    action: "rotas.copiadas_em_lote",
+    entityType: "appRoute",
+    entityId: targetProjectId,
+    metadata: { count: routes.length, fromProjectId: projectId },
+  });
+
+  revalidatePath(`/projetos/${targetProjectId}/rotas`);
+  return { copied: routes.length };
+}
+
 export async function deleteAppRouteAction(routeId: string) {
-  const route = await prisma.appRoute.findUniqueOrThrow({ where: { id: routeId } });
+  const route = await prisma.appRoute.findUnique({ where: { id: routeId } });
+  if (!route) notFound();
   const userId = await requireUserId();
   await requireProjectMembership(userId, route.projectId);
   const isOwner = await isCurrentUserOwner();

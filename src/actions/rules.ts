@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { ProjectRole } from "@prisma/client";
 
 import { auth } from "@/auth";
@@ -13,6 +13,7 @@ import {
   isCurrentUserOwner,
   canDeleteOwnRecord,
 } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity";
 import { createRuleSchema, updateRuleSchema } from "@/lib/validations/rule";
 
 async function requireUserId() {
@@ -23,7 +24,8 @@ async function requireUserId() {
 
 async function requireRuleAccess(ruleId: string) {
   const userId = await requireUserId();
-  const rule = await prisma.rule.findUniqueOrThrow({ where: { id: ruleId } });
+  const rule = await prisma.rule.findUnique({ where: { id: ruleId } });
+  if (!rule) notFound();
   const membership = await requireProjectMembership(userId, rule.projectId);
   return { userId, rule, membership };
 }
@@ -88,6 +90,65 @@ export async function updateRuleAction(
   revalidatePath(`/projetos/${rule.projectId}/regras/${ruleId}`);
   revalidatePath(`/projetos/${rule.projectId}/regras`);
   return {};
+}
+
+export async function copyRuleToProjectAction(ruleId: string, targetProjectId: string) {
+  const rule = await prisma.rule.findUnique({ where: { id: ruleId } });
+  if (!rule) notFound();
+  const userId = await requireUserId();
+  await requireProjectMembership(userId, rule.projectId);
+  await requireProjectRole(userId, targetProjectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  const newRule = await prisma.rule.create({
+    data: {
+      projectId: targetProjectId,
+      title: rule.title,
+      content: rule.content,
+      createdById: userId,
+    },
+  });
+
+  await logActivity({
+    projectId: targetProjectId,
+    userId,
+    action: "regra.copiada",
+    entityType: "rule",
+    entityId: newRule.id,
+    metadata: { title: newRule.title, fromProjectId: rule.projectId, fromRuleId: rule.id },
+  });
+
+  revalidatePath(`/projetos/${targetProjectId}/regras`);
+  return { id: newRule.id };
+}
+
+export async function copyAllRulesToProjectAction(projectId: string, targetProjectId: string) {
+  const userId = await requireUserId();
+  await requireProjectMembership(userId, projectId);
+  await requireProjectRole(userId, targetProjectId, [ProjectRole.ADMIN, ProjectRole.DEVELOPER]);
+
+  const rules = await prisma.rule.findMany({ where: { projectId } });
+  if (rules.length === 0) return { copied: 0 };
+
+  await prisma.rule.createMany({
+    data: rules.map((rule) => ({
+      projectId: targetProjectId,
+      title: rule.title,
+      content: rule.content,
+      createdById: userId,
+    })),
+  });
+
+  await logActivity({
+    projectId: targetProjectId,
+    userId,
+    action: "regras.copiadas_em_lote",
+    entityType: "rule",
+    entityId: targetProjectId,
+    metadata: { count: rules.length, fromProjectId: projectId },
+  });
+
+  revalidatePath(`/projetos/${targetProjectId}/regras`);
+  return { copied: rules.length };
 }
 
 export async function deleteRuleAction(ruleId: string) {

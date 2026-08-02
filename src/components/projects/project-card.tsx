@@ -19,9 +19,17 @@ type ProjectCardProps = {
   pinned: boolean;
   canArchive: boolean;
   canDelete: boolean;
+  canDuplicate: boolean;
 };
 
-export function ProjectCard({ project, role, pinned, canArchive, canDelete }: ProjectCardProps) {
+export function ProjectCard({
+  project,
+  role,
+  pinned,
+  canArchive,
+  canDelete,
+  canDuplicate,
+}: ProjectCardProps) {
   return (
     <Card className="relative h-full transition-colors hover:border-foreground/30">
       <Link
@@ -52,6 +60,7 @@ export function ProjectCard({ project, role, pinned, canArchive, canDelete }: Pr
               pinned={pinned}
               canArchive={canArchive}
               canDelete={canDelete}
+              canDuplicate={canDuplicate}
             />
           </div>
         </div>

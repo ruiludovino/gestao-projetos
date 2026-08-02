@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMembership, getCopyTargetProjects } from "@/lib/project-data";
@@ -25,7 +27,7 @@ export default async function NoteDetailPage({
 
   const [membership, note, members, folders, copyTargetProjects] = await Promise.all([
     getMembership(projectId, userId),
-    prisma.note.findUniqueOrThrow({
+    prisma.note.findUnique({
       where: { id: noteId },
       include: {
         versions: {
@@ -41,6 +43,7 @@ export default async function NoteDetailPage({
     prisma.noteFolder.findMany({ where: { projectId }, orderBy: { name: "asc" } }),
     getCopyTargetProjects(userId, projectId),
   ]);
+  if (!note) notFound();
 
   const canEdit = canEditContent(membership.role);
   const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { NotificationType, Priority, ProjectRole, TaskStatus } from "@prisma/client";
 
 import { auth } from "@/auth";
@@ -74,7 +74,8 @@ async function requireUserId() {
 
 async function requireTaskAccess(taskId: string) {
   const userId = await requireUserId();
-  const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
+  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  if (!task) notFound();
   const membership = await requireProjectMembership(userId, task.projectId);
   return { userId, task, membership };
 }

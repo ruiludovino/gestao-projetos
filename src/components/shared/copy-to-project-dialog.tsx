@@ -31,7 +31,9 @@ export function CopyToProjectDialog({
   iconOnly = false,
 }: {
   projects: Project[];
-  onCopy: (targetProjectId: string) => Promise<{ error?: string; id?: string } | void>;
+  onCopy: (
+    targetProjectId: string,
+  ) => Promise<{ error?: string; id?: string; copied?: number } | void>;
   triggerLabel?: string;
   iconOnly?: boolean;
 }) {
@@ -50,7 +52,15 @@ export function CopyToProjectDialog({
           toast.error(result.error);
           return;
         }
-        toast.success("Copiado com sucesso.");
+        if (result && "copied" in result && typeof result.copied === "number") {
+          toast.success(
+            result.copied === 0
+              ? "Nada para copiar."
+              : `${result.copied} ${result.copied === 1 ? "item copiado" : "itens copiados"} com sucesso.`,
+          );
+        } else {
+          toast.success("Copiado com sucesso.");
+        }
         setOpen(false);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Erro ao copiar.");
@@ -67,6 +77,7 @@ export function CopyToProjectDialog({
             variant="outline"
             size={iconOnly ? "icon-sm" : "sm"}
             aria-label={triggerLabel}
+            onClick={(event: React.MouseEvent) => event.stopPropagation()}
           >
             <Copy className="size-3.5" />
             {!iconOnly && triggerLabel}

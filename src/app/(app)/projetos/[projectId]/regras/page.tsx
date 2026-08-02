@@ -5,10 +5,12 @@ import { pt } from "date-fns/locale";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getMembership } from "@/lib/project-data";
+import { getMembership, getCopyTargetProjects } from "@/lib/project-data";
 import { canEditContent, isCurrentUserOwner } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { DeleteRuleButton } from "@/components/rules/delete-rule-button";
+import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
+import { copyRuleToProjectAction, copyAllRulesToProjectAction } from "@/actions/rules";
 
 export default async function RulesPage({
   params,
@@ -19,7 +21,7 @@ export default async function RulesPage({
   const session = await auth();
   const userId = session!.user.id;
 
-  const [membership, isOwner, rules] = await Promise.all([
+  const [membership, isOwner, rules, copyTargetProjects] = await Promise.all([
     getMembership(projectId, userId),
     isCurrentUserOwner(),
     prisma.rule.findMany({
@@ -27,6 +29,7 @@ export default async function RulesPage({
       orderBy: { updatedAt: "desc" },
       include: { createdBy: { select: { name: true, email: true } } },
     }),
+    getCopyTargetProjects(userId, projectId),
   ]);
 
   const canEdit = canEditContent(membership.role);
@@ -35,16 +38,25 @@ export default async function RulesPage({
     <div>
       <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold tracking-tight">Regras</h1>
-        {canEdit && (
-          <Button
-            render={
-              <Link href={`/projetos/${projectId}/regras/nova`}>
-                <Plus className="size-4" />
-                Nova regra
-              </Link>
-            }
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {canEdit && rules.length > 0 && copyTargetProjects.length > 0 && (
+            <CopyToProjectDialog
+              projects={copyTargetProjects}
+              onCopy={copyAllRulesToProjectAction.bind(null, projectId)}
+              triggerLabel="Copiar todas para outro projeto"
+            />
+          )}
+          {canEdit && (
+            <Button
+              render={
+                <Link href={`/projetos/${projectId}/regras/nova`}>
+                  <Plus className="size-4" />
+                  Nova regra
+                </Link>
+              }
+            />
+          )}
+        </div>
       </div>
 
       {rules.length === 0 ? (
@@ -63,6 +75,12 @@ export default async function RulesPage({
                   <span>
                     Atualizada {formatDistanceToNow(rule.updatedAt, { addSuffix: true, locale: pt })}
                   </span>
+                  <CopyToProjectDialog
+                    projects={copyTargetProjects}
+                    onCopy={copyRuleToProjectAction.bind(null, rule.id)}
+                    triggerLabel="Copiar para projeto"
+                    iconOnly
+                  />
                   {(isOwner || rule.createdById === userId) && (
                     <DeleteRuleButton ruleId={rule.id} />
                   )}

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import {
   deleteProjectAction,
+  duplicateProjectAction,
   setProjectArchivedAction,
   toggleProjectPinAction,
   updateProjectAction,
@@ -47,6 +48,7 @@ export function ProjectCardMenu({
   pinned,
   canArchive,
   canDelete,
+  canDuplicate,
 }: {
   projectId: string;
   name: string;
@@ -55,11 +57,15 @@ export function ProjectCardMenu({
   pinned: boolean;
   canArchive: boolean;
   canDelete: boolean;
+  canDuplicate: boolean;
 }) {
   const [renameOpen, setRenameOpen] = useState(false);
   const [newName, setNewName] = useState(name);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateName, setDuplicateName] = useState(`${name} (cópia)`);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -103,6 +109,21 @@ export function ProjectCardMenu({
         router.refresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Erro ao atualizar projeto.");
+      }
+    });
+  }
+
+  function handleDuplicateConfirm() {
+    if (!duplicateName.trim()) return;
+    setDuplicateError(null);
+    startTransition(async () => {
+      try {
+        const result = await duplicateProjectAction(projectId, duplicateName.trim());
+        if (result?.error) {
+          setDuplicateError(result.error);
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Erro ao duplicar projeto.");
       }
     });
   }
@@ -151,6 +172,17 @@ export function ProjectCardMenu({
               Renomear
             </DropdownMenuItem>
           )}
+          {canDuplicate && (
+            <DropdownMenuItem
+              onClick={() => {
+                setDuplicateName(`${name} (cópia)`);
+                setDuplicateError(null);
+                setDuplicateOpen(true);
+              }}
+            >
+              Duplicar projeto
+            </DropdownMenuItem>
+          )}
           {canArchive && (
             <DropdownMenuItem onClick={() => setArchiveOpen(true)}>
               {archived ? "Remover do histórico" : "Enviar para histórico"}
@@ -182,6 +214,38 @@ export function ProjectCardMenu({
             <DialogClose render={<Button type="button" variant="outline">Cancelar</Button>} />
             <Button type="button" disabled={isPending || !newName.trim()} onClick={handleRenameConfirm}>
               Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={duplicateOpen} onOpenChange={setDuplicateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Duplicar projeto</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Cria uma cópia completa deste projeto (tarefas, bugs, notas, regras, rotas e
+            credenciais) num novo projeto, do qual ficas Admin.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="duplicate-project-name">Nome do novo projeto</Label>
+            <Input
+              id="duplicate-project-name"
+              value={duplicateName}
+              onChange={(event) => setDuplicateName(event.target.value)}
+              autoFocus
+            />
+          </div>
+          {duplicateError && <p className="text-sm text-destructive">{duplicateError}</p>}
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline">Cancelar</Button>} />
+            <Button
+              type="button"
+              disabled={isPending || !duplicateName.trim()}
+              onClick={handleDuplicateConfirm}
+            >
+              {isPending ? "A duplicar..." : "Duplicar"}
             </Button>
           </DialogFooter>
         </DialogContent>

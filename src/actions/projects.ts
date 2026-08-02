@@ -92,6 +92,264 @@ export async function createProjectAction(
   redirect(`/projetos/${project.id}`);
 }
 
+export async function duplicateProjectAction(sourceProjectId: string, newName: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "Não autenticado." };
+  }
+  if (!session.user.email || !isOwnerEmail(session.user.email)) {
+    return { error: "Só o dono da conta pode duplicar projetos." };
+  }
+  const userId = session.user.id;
+
+  const nameParsed = createProjectSchema.shape.name.safeParse(newName.trim());
+  if (!nameParsed.success) {
+    return { error: nameParsed.error.issues[0]?.message ?? "Nome inválido." };
+  }
+
+  const sourceProject = await prisma.project.findUnique({ where: { id: sourceProjectId } });
+  if (!sourceProject) return { error: "Projeto de origem não encontrado." };
+
+  const slug = await generateUniqueSlug(nameParsed.data);
+
+  const newProjectId = await prisma.$transaction(
+    async (tx) => {
+      const newProject = await tx.project.create({
+        data: {
+          name: nameParsed.data,
+          description: sourceProject.description,
+          slug,
+          createdById: userId,
+          members: { create: { userId, role: ProjectRole.ADMIN } },
+        },
+      });
+
+      // Labels (copiadas primeiro para poder remapear as associacoes dos bugs)
+      const labels = await tx.label.findMany({ where: { projectId: sourceProjectId } });
+      const labelIdMap = new Map<string, string>();
+      for (const label of labels) {
+        const created = await tx.label.create({
+          data: { projectId: newProject.id, name: label.name, color: label.color },
+        });
+        labelIdMap.set(label.id, created.id);
+      }
+
+      // Pastas de tarefas (criadas por ordem, para os pais existirem antes dos filhos)
+      const taskFolders = await tx.taskFolder.findMany({ where: { projectId: sourceProjectId } });
+      const taskFolderIdMap = new Map<string, string>();
+      const pendingTaskFolders = [...taskFolders];
+      while (pendingTaskFolders.length > 0) {
+        const idx = pendingTaskFolders.findIndex(
+          (f) => !f.parentId || taskFolderIdMap.has(f.parentId),
+        );
+        if (idx === -1) break;
+        const folder = pendingTaskFolders.splice(idx, 1)[0];
+        const created = await tx.taskFolder.create({
+          data: {
+            projectId: newProject.id,
+            name: folder.name,
+            parentId: folder.parentId ? taskFolderIdMap.get(folder.parentId) : null,
+          },
+        });
+        taskFolderIdMap.set(folder.id, created.id);
+      }
+
+      // Tarefas de topo + subtarefas
+      const tasks = await tx.task.findMany({
+        where: { projectId: sourceProjectId, parentTaskId: null },
+        orderBy: [{ status: "asc" }, { position: "asc" }],
+      });
+      for (const task of tasks) {
+        const project = await tx.project.update({
+          where: { id: newProject.id },
+          data: { taskSeq: { increment: 1 } },
+        });
+        const newTask = await tx.task.create({
+          data: {
+            projectId: newProject.id,
+            number: project.taskSeq,
+            folderId: task.folderId ? taskFolderIdMap.get(task.folderId) : null,
+            title: task.title,
+            description: task.description,
+            priority: task.priority,
+            status: task.status,
+            position: task.position,
+            deadline: task.deadline,
+            createdById: userId,
+          },
+        });
+
+        const subtasks = await tx.task.findMany({
+          where: { parentTaskId: task.id },
+          orderBy: { createdAt: "asc" },
+        });
+        for (const subtask of subtasks) {
+          const subtaskProject = await tx.project.update({
+            where: { id: newProject.id },
+            data: { taskSeq: { increment: 1 } },
+          });
+          await tx.task.create({
+            data: {
+              projectId: newProject.id,
+              number: subtaskProject.taskSeq,
+              title: subtask.title,
+              priority: subtask.priority,
+              status: subtask.status,
+              parentTaskId: newTask.id,
+              createdById: userId,
+            },
+          });
+        }
+      }
+
+      // Pastas de notas + notas (com historico de versoes)
+      const noteFolders = await tx.noteFolder.findMany({ where: { projectId: sourceProjectId } });
+      const noteFolderIdMap = new Map<string, string>();
+      const pendingNoteFolders = [...noteFolders];
+      while (pendingNoteFolders.length > 0) {
+        const idx = pendingNoteFolders.findIndex(
+          (f) => !f.parentId || noteFolderIdMap.has(f.parentId),
+        );
+        if (idx === -1) break;
+        const folder = pendingNoteFolders.splice(idx, 1)[0];
+        const created = await tx.noteFolder.create({
+          data: {
+            projectId: newProject.id,
+            name: folder.name,
+            parentId: folder.parentId ? noteFolderIdMap.get(folder.parentId) : null,
+          },
+        });
+        noteFolderIdMap.set(folder.id, created.id);
+      }
+
+      const notes = await tx.note.findMany({ where: { projectId: sourceProjectId } });
+      for (const note of notes) {
+        const versions = await tx.noteVersion.findMany({
+          where: { noteId: note.id },
+          orderBy: { createdAt: "asc" },
+        });
+        await tx.note.create({
+          data: {
+            projectId: newProject.id,
+            folderId: note.folderId ? noteFolderIdMap.get(note.folderId) : null,
+            title: note.title,
+            content: note.content,
+            isPinned: note.isPinned,
+            isResolved: note.isResolved,
+            createdById: userId,
+            versions: versions.length
+              ? {
+                  create: versions.map((version) => ({
+                    title: version.title,
+                    content: version.content,
+                    editedById: userId,
+                    createdAt: version.createdAt,
+                  })),
+                }
+              : undefined,
+          },
+        });
+      }
+
+      // Regras
+      const rules = await tx.rule.findMany({ where: { projectId: sourceProjectId } });
+      if (rules.length > 0) {
+        await tx.rule.createMany({
+          data: rules.map((rule) => ({
+            projectId: newProject.id,
+            title: rule.title,
+            content: rule.content,
+            createdById: userId,
+          })),
+        });
+      }
+
+      // Rotas da aplicacao
+      const routes = await tx.appRoute.findMany({ where: { projectId: sourceProjectId } });
+      if (routes.length > 0) {
+        await tx.appRoute.createMany({
+          data: routes.map((route) => ({
+            projectId: newProject.id,
+            description: route.description,
+            link: route.link,
+            notes: route.notes,
+            createdById: userId,
+          })),
+        });
+      }
+
+      // Credenciais (ciphertext copiado tal e qual, sem re-encriptar)
+      const credentials = await tx.credential.findMany({ where: { projectId: sourceProjectId } });
+      if (credentials.length > 0) {
+        await tx.credential.createMany({
+          data: credentials.map((credential) => ({
+            projectId: newProject.id,
+            serviceName: credential.serviceName,
+            url: credential.url,
+            username: credential.username,
+            passwordCiphertext: credential.passwordCiphertext,
+            passwordIv: credential.passwordIv,
+            passwordAuthTag: credential.passwordAuthTag,
+            notesCiphertext: credential.notesCiphertext,
+            notesIv: credential.notesIv,
+            notesAuthTag: credential.notesAuthTag,
+            cost: credential.cost,
+            billingCycle: credential.billingCycle,
+            createdById: userId,
+          })),
+        });
+      }
+
+      // Bugs + labels associadas
+      const bugs = await tx.bug.findMany({
+        where: { projectId: sourceProjectId },
+        orderBy: { createdAt: "asc" },
+        include: { labels: true },
+      });
+      for (const bug of bugs) {
+        const bugProject = await tx.project.update({
+          where: { id: newProject.id },
+          data: { bugSeq: { increment: 1 } },
+        });
+        const newBug = await tx.bug.create({
+          data: {
+            projectId: newProject.id,
+            number: bugProject.bugSeq,
+            title: bug.title,
+            description: bug.description,
+            priority: bug.priority,
+            status: bug.status,
+            reporterId: userId,
+          },
+        });
+        const mappedLabelIds = bug.labels
+          .map((bugLabel) => labelIdMap.get(bugLabel.labelId))
+          .filter((id): id is string => !!id);
+        if (mappedLabelIds.length > 0) {
+          await tx.bugLabel.createMany({
+            data: mappedLabelIds.map((labelId) => ({ bugId: newBug.id, labelId })),
+          });
+        }
+      }
+
+      return newProject.id;
+    },
+    { timeout: 30000, maxWait: 10000 },
+  );
+
+  await logActivity({
+    projectId: newProjectId,
+    userId,
+    action: "projeto.duplicado",
+    entityType: "project",
+    entityId: newProjectId,
+    metadata: { fromProjectId: sourceProjectId, fromProjectName: sourceProject.name },
+  });
+
+  revalidatePath("/projetos");
+  redirect(`/projetos/${newProjectId}`);
+}
+
 export async function updateProjectAction(
   projectId: string,
   _prevState: ProjectFormState,

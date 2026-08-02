@@ -6,7 +6,7 @@ import { TaskStatus } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getMembership } from "@/lib/project-data";
+import { getMembership, getCopyTargetProjects } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
 import { isOwnerEmail } from "@/lib/invites";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,8 @@ import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { ResolveTaskButton } from "@/components/tasks/resolve-task-button";
 import { DeleteTaskButton } from "@/components/tasks/delete-task-button";
 import { FolderMenu } from "@/components/tasks/folder-menu";
+import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
+import { copyTaskToProjectAction } from "@/actions/tasks";
 
 export default async function TasksListPage({
   params,
@@ -40,7 +42,7 @@ export default async function TasksListPage({
   const userId = session!.user.id;
   const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
 
-  const [membership, members, folders, tasks] = await Promise.all([
+  const [membership, members, folders, tasks, copyTargetProjects] = await Promise.all([
     getMembership(projectId, userId),
     prisma.projectMember.findMany({
       where: { projectId },
@@ -58,9 +60,9 @@ export default async function TasksListPage({
       orderBy: [{ status: "asc" }, { position: "asc" }],
       include: {
         assignee: { select: { name: true, email: true, image: true } },
-        createdBy: { select: { name: true, email: true, image: true } },
       },
     }),
+    getCopyTargetProjects(userId, projectId),
   ]);
 
   const canEdit = canEditContent(membership.role);
@@ -119,23 +121,21 @@ export default async function TasksListPage({
           {isHistory ? "Ainda não há tarefas concluídas." : "Ainda não há tarefas."}
         </p>
       ) : (
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow>
               <TableHead className="w-20">ID</TableHead>
               <TableHead>Título</TableHead>
-              <TableHead>Prioridade</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Deadline</TableHead>
-              <TableHead>Atribuído</TableHead>
-              <TableHead>Criado por</TableHead>
+              <TableHead className="w-28">Prioridade</TableHead>
+              <TableHead className="w-24">Estado</TableHead>
+              <TableHead className="w-28">Deadline</TableHead>
+              <TableHead className="w-48">Atribuído</TableHead>
               {canEditContent(membership.role) && <TableHead className="w-32">Ações</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {tasks.map((task) => {
               const assigneeLabel = task.assignee?.name ?? task.assignee?.email;
-              const creatorLabel = task.createdBy?.name ?? task.createdBy?.email;
               return (
                 <TableRow key={task.id}>
                   <TableCell className="font-mono text-xs text-muted-foreground">
@@ -144,7 +144,8 @@ export default async function TasksListPage({
                   <TableCell>
                     <Link
                       href={`/projetos/${projectId}/tarefas/${task.id}`}
-                      className="font-medium hover:underline"
+                      className="block truncate font-medium hover:underline"
+                      title={task.title}
                     >
                       {task.title}
                     </Link>
@@ -171,23 +172,16 @@ export default async function TasksListPage({
                       <span className="text-sm text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell>
-                    {task.createdBy ? (
-                      <div className="flex items-center gap-2">
-                        <Avatar className="size-6">
-                          <AvatarImage src={task.createdBy.image ?? undefined} alt={creatorLabel ?? ""} />
-                          <AvatarFallback>{creatorLabel?.charAt(0).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">{creatorLabel}</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
                   {canEditContent(membership.role) && (
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <ResolveTaskButton taskId={task.id} isHistory={isHistory} />
+                        <CopyToProjectDialog
+                          projects={copyTargetProjects}
+                          onCopy={copyTaskToProjectAction.bind(null, task.id)}
+                          triggerLabel="Copiar para projeto"
+                          iconOnly
+                        />
                         {(isOwner || task.createdById === userId) && (
                           <DeleteTaskButton taskId={task.id} size="icon-sm" />
                         )}

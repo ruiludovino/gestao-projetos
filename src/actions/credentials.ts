@@ -293,6 +293,44 @@ export async function copyCredentialToProjectAction(credentialId: string, target
   return { id: newCredential.id };
 }
 
+export async function copyAllCredentialsToProjectAction(projectId: string, targetProjectId: string) {
+  const { userId } = await requireCredentialsAccess(projectId);
+  await requireCredentialsAccess(targetProjectId);
+
+  const credentials = await prisma.credential.findMany({ where: { projectId } });
+  if (credentials.length === 0) return { copied: 0 };
+
+  await prisma.credential.createMany({
+    data: credentials.map((credential) => ({
+      projectId: targetProjectId,
+      serviceName: credential.serviceName,
+      url: credential.url,
+      username: credential.username,
+      passwordCiphertext: credential.passwordCiphertext,
+      passwordIv: credential.passwordIv,
+      passwordAuthTag: credential.passwordAuthTag,
+      notesCiphertext: credential.notesCiphertext,
+      notesIv: credential.notesIv,
+      notesAuthTag: credential.notesAuthTag,
+      cost: credential.cost,
+      billingCycle: credential.billingCycle,
+      createdById: userId,
+    })),
+  });
+
+  await logActivity({
+    projectId: targetProjectId,
+    userId,
+    action: "credenciais.copiadas_em_lote",
+    entityType: "credential",
+    entityId: targetProjectId,
+    metadata: { count: credentials.length, fromProjectId: projectId },
+  });
+
+  revalidatePath(`/projetos/${targetProjectId}/credenciais`);
+  return { copied: credentials.length };
+}
+
 export async function revealCredentialAction(credentialId: string) {
   const credential = await prisma.credential.findUniqueOrThrow({ where: { id: credentialId } });
   const { userId } = await requireCredentialsAccess(credential.projectId);

@@ -1,5 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { pt } from "date-fns/locale";
+import { notFound } from "next/navigation";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -32,7 +33,7 @@ export default async function TaskDetailPage({
 
   const [membership, task, members, folders, copyTargetProjects] = await Promise.all([
     getMembership(projectId, userId),
-    prisma.task.findUniqueOrThrow({
+    prisma.task.findUnique({
       where: { id: taskId },
       include: {
         subtasks: { orderBy: { createdAt: "asc" } },
@@ -50,6 +51,7 @@ export default async function TaskDetailPage({
     prisma.taskFolder.findMany({ where: { projectId }, orderBy: { name: "asc" } }),
     getCopyTargetProjects(userId, projectId),
   ]);
+  if (!task) notFound();
 
   const canEdit = canEditContent(membership.role);
   const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);

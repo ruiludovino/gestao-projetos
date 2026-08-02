@@ -5,7 +5,7 @@ import { pt } from "date-fns/locale";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getMembership } from "@/lib/project-data";
+import { getMembership, getCopyTargetProjects } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
 import { isOwnerEmail } from "@/lib/invites";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { ResolveNoteButton } from "@/components/notes/resolve-note-button";
 import { DeleteNoteButton } from "@/components/notes/delete-note-button";
 import { CopyNoteContentButton } from "@/components/notes/copy-note-content-button";
+import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
+import { copyNoteToProjectAction } from "@/actions/notes";
 import { cn } from "@/lib/utils";
 
 function buildFolderDepths(folders: { id: string; parentId: string | null }[]) {
@@ -44,7 +46,7 @@ export default async function NotesPage({
   const session = await auth();
   const userId = session!.user.id;
 
-  const [membership, members, folders, notes] = await Promise.all([
+  const [membership, members, folders, notes, copyTargetProjects] = await Promise.all([
     getMembership(projectId, userId),
     prisma.projectMember.findMany({
       where: { projectId },
@@ -72,6 +74,7 @@ export default async function NotesPage({
         assignee: { select: { name: true, email: true } },
       },
     }),
+    getCopyTargetProjects(userId, projectId),
   ]);
 
   const canEdit = canEditContent(membership.role);
@@ -176,6 +179,12 @@ export default async function NotesPage({
                       {formatDistanceToNow(note.updatedAt, { addSuffix: true, locale: pt })}
                     </span>
                     <CopyNoteContentButton content={note.content} />
+                    <CopyToProjectDialog
+                      projects={copyTargetProjects}
+                      onCopy={copyNoteToProjectAction.bind(null, note.id)}
+                      triggerLabel="Copiar para projeto"
+                      iconOnly
+                    />
                     {canEdit && (
                       <ResolveNoteButton noteId={note.id} isResolved={note.isResolved} />
                     )}

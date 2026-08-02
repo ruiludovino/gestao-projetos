@@ -4,7 +4,7 @@ import { BugStatus } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getMembership } from "@/lib/project-data";
+import { getMembership, getCopyTargetProjects } from "@/lib/project-data";
 import { canEditContent } from "@/lib/permissions";
 import { isOwnerEmail } from "@/lib/invites";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,8 @@ import { BugStatusBadge } from "@/components/shared/bug-status-badge";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { ResolveBugButton } from "@/components/bugs/resolve-bug-button";
 import { DeleteBugButton } from "@/components/bugs/delete-bug-button";
+import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
+import { copyBugToProjectAction } from "@/actions/bugs";
 
 const RESOLVED_STATUSES: BugStatus[] = [BugStatus.RESOLVIDO, BugStatus.FECHADO];
 
@@ -39,7 +41,7 @@ export default async function BugsPage({
   const userId = session!.user.id;
   const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
 
-  const [membership, members, bugs] = await Promise.all([
+  const [membership, members, bugs, copyTargetProjects] = await Promise.all([
     getMembership(projectId, userId),
     prisma.projectMember.findMany({
       where: { projectId },
@@ -58,6 +60,7 @@ export default async function BugsPage({
         labels: { include: { label: true } },
       },
     }),
+    getCopyTargetProjects(userId, projectId),
   ]);
 
   const toggleParams = new URLSearchParams();
@@ -171,6 +174,12 @@ export default async function BugsPage({
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <ResolveBugButton bugId={bug.id} isHistory={isHistory} />
+                        <CopyToProjectDialog
+                          projects={copyTargetProjects}
+                          onCopy={copyBugToProjectAction.bind(null, bug.id)}
+                          triggerLabel="Copiar para projeto"
+                          iconOnly
+                        />
                         {(isOwner || bug.reporterId === userId) && (
                           <DeleteBugButton bugId={bug.id} size="icon-sm" />
                         )}

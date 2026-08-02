@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMembership } from "@/lib/project-data";
@@ -17,8 +19,9 @@ export default async function RuleDetailPage({
 
   const [membership, rule] = await Promise.all([
     getMembership(projectId, userId),
-    prisma.rule.findUniqueOrThrow({ where: { id: ruleId } }),
+    prisma.rule.findUnique({ where: { id: ruleId } }),
   ]);
+  if (!rule) notFound();
 
   const canEdit = canEditContent(membership.role);
   const isOwner = !!session?.user?.email && isOwnerEmail(session.user.email);
