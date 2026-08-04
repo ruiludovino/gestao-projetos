@@ -17,14 +17,18 @@ import {
 import { EditAppRouteDialog } from "@/components/app-routes/edit-app-route-dialog";
 import { DeleteAppRouteButton } from "@/components/app-routes/delete-app-route-button";
 import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
+import { AppRoutesSearch } from "@/components/app-routes/app-routes-search";
 import { copyAppRouteToProjectAction, copyAllAppRoutesToProjectAction } from "@/actions/app-routes";
 
 export default async function AppRoutesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const { projectId } = await params;
+  const { q } = await searchParams;
   const session = await auth();
   const userId = session!.user.id;
 
@@ -32,7 +36,17 @@ export default async function AppRoutesPage({
     getMembership(projectId, userId),
     isCurrentUserOwner(),
     prisma.appRoute.findMany({
-      where: { projectId },
+      where: {
+        projectId,
+        ...(q
+          ? {
+              OR: [
+                { description: { contains: q, mode: "insensitive" } },
+                { link: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
       orderBy: { createdAt: "asc" },
       include: { createdBy: { select: { name: true, email: true } } },
     }),
@@ -46,6 +60,7 @@ export default async function AppRoutesPage({
       <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold tracking-tight">Rotas da Aplicação</h1>
         <div className="flex items-center gap-2">
+          <AppRoutesSearch />
           {canEdit && routes.length > 0 && copyTargetProjects.length > 0 && (
             <CopyToProjectDialog
               projects={copyTargetProjects}
@@ -67,7 +82,9 @@ export default async function AppRoutesPage({
       </div>
 
       {routes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Ainda não há rotas registadas.</p>
+        <p className="text-sm text-muted-foreground">
+          {q ? "Nenhuma rota encontrada para essa pesquisa." : "Ainda não há rotas registadas."}
+        </p>
       ) : (
         <Table>
           <TableHeader>
