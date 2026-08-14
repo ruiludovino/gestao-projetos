@@ -15,19 +15,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CredentialRow } from "@/components/credentials/credential-row";
+import { CredentialsSearch } from "@/components/credentials/credentials-search";
+import {
+  SortableCredentialHead,
+  type CredentialSortField,
+  type SortDir,
+} from "@/components/credentials/sortable-credential-head";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
 import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
 import { copyAllCredentialsToProjectAction } from "@/actions/credentials";
+
+const SORT_FIELDS: CredentialSortField[] = ["serviceName", "username"];
 
 export default async function CredentialsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ responsavel?: string }>;
+  searchParams: Promise<{ responsavel?: string; q?: string; sort?: string; dir?: string }>;
 }) {
   const { projectId } = await params;
-  const { responsavel } = await searchParams;
+  const { responsavel, q, sort, dir } = await searchParams;
+  const sortField: CredentialSortField = SORT_FIELDS.includes(sort as CredentialSortField)
+    ? (sort as CredentialSortField)
+    : "serviceName";
+  const sortDir: SortDir = dir === "desc" ? "desc" : "asc";
   const session = await auth();
   const userId = session!.user.id;
 
@@ -44,8 +56,20 @@ export default async function CredentialsPage({
 
   const [credentials, members, copyTargetProjects] = await Promise.all([
     prisma.credential.findMany({
-      where: { projectId, ...(responsavel ? { assigneeId: responsavel } : {}) },
-      orderBy: { serviceName: "asc" },
+      where: {
+        projectId,
+        ...(responsavel ? { assigneeId: responsavel } : {}),
+        ...(q
+          ? {
+              OR: [
+                { serviceName: { contains: q, mode: "insensitive" } },
+                { url: { contains: q, mode: "insensitive" } },
+                { username: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { [sortField]: sortDir },
       include: {
         assignee: { select: { name: true, email: true } },
         createdBy: { select: { name: true, email: true } },
@@ -58,6 +82,15 @@ export default async function CredentialsPage({
     getCopyTargetProjects(userId, projectId),
   ]);
 
+  function buildSortHref(field: CredentialSortField, nextDir: SortDir) {
+    const params = new URLSearchParams();
+    if (responsavel) params.set("responsavel", responsavel);
+    if (q) params.set("q", q);
+    params.set("sort", field);
+    params.set("dir", nextDir);
+    return `/projetos/${projectId}/credenciais?${params.toString()}`;
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between gap-4">
@@ -69,6 +102,7 @@ export default async function CredentialsPage({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <CredentialsSearch />
           <AssigneeFilter members={members} />
           {credentials.length > 0 && copyTargetProjects.length > 0 && (
             <CopyToProjectDialog
@@ -89,13 +123,29 @@ export default async function CredentialsPage({
       </div>
 
       {credentials.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Ainda não há credenciais guardadas.</p>
+        <p className="text-sm text-muted-foreground">
+          {q || responsavel
+            ? "Nenhuma credencial encontrada para essa pesquisa."
+            : "Ainda não há credenciais guardadas."}
+        </p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Serviço</TableHead>
-              <TableHead>Username</TableHead>
+              <SortableCredentialHead
+                field="serviceName"
+                label="Serviço"
+                currentSort={sortField}
+                currentDir={sortDir}
+                buildHref={buildSortHref}
+              />
+              <SortableCredentialHead
+                field="username"
+                label="Username"
+                currentSort={sortField}
+                currentDir={sortDir}
+                buildHref={buildSortHref}
+              />
               <TableHead>Password</TableHead>
               <TableHead>Custo</TableHead>
               <TableHead>Responsável</TableHead>
