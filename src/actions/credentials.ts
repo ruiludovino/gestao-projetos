@@ -16,10 +16,15 @@ import {
   canDeleteOwnRecord,
 } from "@/lib/permissions";
 import { sendAssignmentEmail } from "@/lib/email";
-import { createCredentialSchema, updateCredentialSchema } from "@/lib/validations/credential";
+import {
+  createCredentialSchema,
+  updateCredentialSchema,
+  credentialCategorySchema,
+} from "@/lib/validations/credential";
 
 const NO_ASSIGNEE = "__unassigned__";
 const NO_BILLING_CYCLE = "__none__";
+const NO_CATEGORY = "__none__";
 
 function normalizeAssigneeId(value: FormDataEntryValue | null): string {
   if (!value || value === NO_ASSIGNEE) return "";
@@ -28,6 +33,11 @@ function normalizeAssigneeId(value: FormDataEntryValue | null): string {
 
 function normalizeBillingCycle(value: FormDataEntryValue | null): string {
   if (!value || value === NO_BILLING_CYCLE) return "";
+  return String(value);
+}
+
+function normalizeCategoryId(value: FormDataEntryValue | null): string {
+  if (!value || value === NO_CATEGORY) return "";
   return String(value);
 }
 
@@ -86,6 +96,14 @@ async function notifyCredentialAssignee({
   }
 }
 
+async function requireCategoryInProject(categoryId: string, projectId: string) {
+  const category = await prisma.credentialCategory.findUnique({ where: { id: categoryId } });
+  if (!category || category.projectId !== projectId) {
+    throw new Error("Categoria inválida para este projeto.");
+  }
+  return category;
+}
+
 export type CredentialFormState = {
   error?: string;
   fieldErrors?: Record<string, string[]>;
@@ -105,6 +123,7 @@ export async function createCredentialAction(
     password: formData.get("password"),
     notes: formData.get("notes"),
     assigneeId: normalizeAssigneeId(formData.get("assigneeId")),
+    categoryId: normalizeCategoryId(formData.get("categoryId")),
     cost: formData.get("cost"),
     billingCycle: normalizeBillingCycle(formData.get("billingCycle")),
   });
@@ -112,10 +131,14 @@ export async function createCredentialAction(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const { serviceName, url, username, password, notes, assigneeId, cost, billingCycle } =
+  const { serviceName, url, username, password, notes, assigneeId, categoryId, cost, billingCycle } =
     parsed.data;
   const passwordEnc = encrypt(password);
   const notesEnc = notes ? encrypt(notes) : null;
+
+  if (categoryId) {
+    await requireCategoryInProject(categoryId, projectId);
+  }
 
   const credential = await prisma.credential.create({
     data: {
@@ -130,6 +153,7 @@ export async function createCredentialAction(
       notesIv: notesEnc?.iv ?? null,
       notesAuthTag: notesEnc?.authTag ?? null,
       assigneeId: assigneeId || userId,
+      categoryId: categoryId || null,
       cost: cost ? Number(cost) : null,
       billingCycle: billingCycle || null,
       createdById: userId,
@@ -173,6 +197,7 @@ export async function updateCredentialAction(
     password: formData.get("password"),
     notes: formData.get("notes"),
     assigneeId: normalizeAssigneeId(formData.get("assigneeId")),
+    categoryId: normalizeCategoryId(formData.get("categoryId")),
     cost: formData.get("cost"),
     billingCycle: normalizeBillingCycle(formData.get("billingCycle")),
   });
@@ -180,13 +205,16 @@ export async function updateCredentialAction(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const { serviceName, url, username, password, notes, assigneeId, cost, billingCycle } =
+  const { serviceName, url, username, password, notes, assigneeId, categoryId, cost, billingCycle } =
     parsed.data;
   const notesEnc = notes ? encrypt(notes) : null;
   const nextAssigneeId = assigneeId || null;
 
   if (nextAssigneeId) {
     await requireProjectMembership(nextAssigneeId, credential.projectId);
+  }
+  if (categoryId) {
+    await requireCategoryInProject(categoryId, credential.projectId);
   }
 
   await prisma.credential.update({
@@ -199,6 +227,7 @@ export async function updateCredentialAction(
       notesIv: notesEnc?.iv ?? null,
       notesAuthTag: notesEnc?.authTag ?? null,
       assigneeId: nextAssigneeId,
+      categoryId: categoryId || null,
       cost: cost ? Number(cost) : null,
       billingCycle: billingCycle || null,
       ...(password
@@ -360,4 +389,74 @@ export async function revealCredentialAction(credentialId: string) {
   });
 
   return { password, notes, username: credential.username };
+}
+
+export type CredentialCategoryOption = { id: string; name: string; color: string };
+
+export async function createCredentialCategoryAction(
+  projectId: string,
+  name: string,
+  color: string,
+): Promise<CredentialCategoryOption> {
+  await requireCredentialsAccess(projectId);
+
+  const parsed = credentialCategorySchema.safeParse({ name, color });
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Dados inválidos.");
+  }
+
+  const existing = await prisma.credentialCategory.findUnique({
+    where: { projectId_name: { projectId, name: parsed.data.name } },
+  });
+  if (existing) {
+    throw new Error("Já existe uma categoria com este nome.");
+  }
+
+  const category = await prisma.credentialCategory.create({
+    data: { projectId, ...parsed.data },
+  });
+
+  revalidatePath(`/projetos/${projectId}/credenciais`);
+  revalidatePath(`/projetos/${projectId}/credenciais/novo`);
+  return { id: category.id, name: category.name, color: category.color };
+}
+
+export async function renameCredentialCategoryAction(
+  categoryId: string,
+  name: string,
+  color: string,
+): Promise<CredentialCategoryOption> {
+  const category = await prisma.credentialCategory.findUniqueOrThrow({ where: { id: categoryId } });
+  await requireCredentialsAccess(category.projectId);
+
+  const parsed = credentialCategorySchema.safeParse({ name, color });
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Dados inválidos.");
+  }
+
+  const duplicate = await prisma.credentialCategory.findUnique({
+    where: { projectId_name: { projectId: category.projectId, name: parsed.data.name } },
+  });
+  if (duplicate && duplicate.id !== categoryId) {
+    throw new Error("Já existe uma categoria com este nome.");
+  }
+
+  const updated = await prisma.credentialCategory.update({
+    where: { id: categoryId },
+    data: parsed.data,
+  });
+
+  revalidatePath(`/projetos/${category.projectId}/credenciais`);
+  revalidatePath(`/projetos/${category.projectId}/credenciais/novo`);
+  return { id: updated.id, name: updated.name, color: updated.color };
+}
+
+export async function deleteCredentialCategoryAction(categoryId: string) {
+  const category = await prisma.credentialCategory.findUniqueOrThrow({ where: { id: categoryId } });
+  await requireCredentialsAccess(category.projectId);
+
+  await prisma.credentialCategory.delete({ where: { id: categoryId } });
+
+  revalidatePath(`/projetos/${category.projectId}/credenciais`);
+  revalidatePath(`/projetos/${category.projectId}/credenciais/novo`);
 }

@@ -12,10 +12,16 @@ export default async function NewCredentialPage({
   const session = await auth();
   const userId = session!.user.id;
 
-  const members = await prisma.projectMember.findMany({
-    where: { projectId },
-    include: { user: { select: { name: true, email: true } } },
-  });
+  const [members, categories] = await Promise.all([
+    prisma.projectMember.findMany({
+      where: { projectId },
+      include: { user: { select: { name: true, email: true } } },
+    }),
+    prisma.credentialCategory.findMany({
+      where: { projectId },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   return (
     <div className="mx-auto max-w-lg">
@@ -25,7 +31,12 @@ export default async function NewCredentialPage({
           <CardTitle>Detalhes</CardTitle>
         </CardHeader>
         <CardContent>
-          <CredentialForm projectId={projectId} members={members} currentUserId={userId} />
+          <CredentialForm
+            projectId={projectId}
+            members={members}
+            currentUserId={userId}
+            categories={categories}
+          />
         </CardContent>
       </Card>
     </div>

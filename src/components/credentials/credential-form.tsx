@@ -4,8 +4,13 @@ import { useActionState } from "react";
 
 import { BillingCycle } from "@prisma/client";
 
-import { createCredentialAction, type CredentialFormState } from "@/actions/credentials";
+import {
+  createCredentialAction,
+  type CredentialCategoryOption,
+  type CredentialFormState,
+} from "@/actions/credentials";
 import { BILLING_CYCLE_LABELS } from "@/components/credentials/billing-cycle";
+import { CredentialCategorySelect } from "@/components/credentials/credential-category-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,10 +31,12 @@ export function CredentialForm({
   projectId,
   members,
   currentUserId,
+  categories,
 }: {
   projectId: string;
   members: Member[];
   currentUserId: string;
+  categories: CredentialCategoryOption[];
 }) {
   const action = createCredentialAction.bind(null, projectId);
   const [state, formAction, isPending] = useActionState(action, initialState);
@@ -67,6 +74,11 @@ export function CredentialForm({
       <div className="space-y-2">
         <Label htmlFor="notes">Notas (opcional)</Label>
         <Textarea id="notes" name="notes" rows={3} />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Categoria (opcional)</Label>
+        <CredentialCategorySelect projectId={projectId} categories={categories} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">

@@ -128,6 +128,7 @@ model Project {
   tasks        Task[]
   taskFolders  TaskFolder[]
   credentials  Credential[]
+  credentialCategories CredentialCategory[]
   notes        Note[]
   noteFolders  NoteFolder[]
   labels       Label[]
@@ -383,9 +384,25 @@ enum BillingCycle {
   ANUAL
 }
 
+model CredentialCategory {
+  id        String  @id @default(cuid())
+  projectId String
+  name      String
+  color     String  @default("#64748b")
+
+  createdAt DateTime @default(now())
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  credentials Credential[]
+
+  @@unique([projectId, name])
+  @@map("credential_categories")
+}
+
 model Credential {
   id          String  @id @default(cuid())
   projectId   String
+  categoryId  String?
   serviceName String
   url         String?
   username    String?
@@ -409,11 +426,13 @@ model Credential {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy User    @relation("CredentialCreatedBy", fields: [createdById], references: [id])
-  assignee  User?   @relation("CredentialAssignee", fields: [assigneeId], references: [id])
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category  CredentialCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy User                @relation("CredentialCreatedBy", fields: [createdById], references: [id])
+  assignee  User?               @relation("CredentialAssignee", fields: [assigneeId], references: [id])
 
   @@index([projectId])
+  @@index([categoryId])
   @@map("credentials")
 }
 

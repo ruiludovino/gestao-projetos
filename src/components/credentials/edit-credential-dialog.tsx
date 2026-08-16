@@ -8,9 +8,11 @@ import { toast } from "sonner";
 import {
   revealCredentialAction,
   updateCredentialAction,
+  type CredentialCategoryOption,
 } from "@/actions/credentials";
 import { copyToClipboard } from "@/components/credentials/credential-row";
 import { BILLING_CYCLE_LABELS } from "@/components/credentials/billing-cycle";
+import { CredentialCategorySelect } from "@/components/credentials/credential-category-select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,10 +44,12 @@ type Member = {
 
 type Credential = {
   id: string;
+  projectId: string;
   serviceName: string;
   url: string | null;
   username: string | null;
   assigneeId: string | null;
+  categoryId: string | null;
   cost: number | null;
   billingCycle: BillingCycle | null;
 };
@@ -53,12 +57,14 @@ type Credential = {
 export function EditCredentialDialog({
   credential,
   members,
+  categories,
   open: openProp,
   onOpenChange: onOpenChangeProp,
   hideTrigger = false,
 }: {
   credential: Credential;
   members: Member[];
+  categories: CredentialCategoryOption[];
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   hideTrigger?: boolean;
@@ -245,6 +251,14 @@ export function EditCredentialDialog({
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 disabled={loadingNotes}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria (opcional)</Label>
+              <CredentialCategorySelect
+                projectId={credential.projectId}
+                categories={categories}
+                defaultValue={credential.categoryId}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">

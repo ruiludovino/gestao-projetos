@@ -54,7 +54,7 @@ export default async function CredentialsPage({
     );
   }
 
-  const [credentials, members, copyTargetProjects] = await Promise.all([
+  const [credentials, members, categories, copyTargetProjects] = await Promise.all([
     prisma.credential.findMany({
       where: {
         projectId,
@@ -73,11 +73,16 @@ export default async function CredentialsPage({
       include: {
         assignee: { select: { name: true, email: true } },
         createdBy: { select: { name: true, email: true } },
+        category: { select: { name: true, color: true } },
       },
     }),
     prisma.projectMember.findMany({
       where: { projectId },
       include: { user: { select: { name: true, email: true } } },
+    }),
+    prisma.credentialCategory.findMany({
+      where: { projectId },
+      orderBy: { name: "asc" },
     }),
     getCopyTargetProjects(userId, projectId),
   ]);
@@ -147,6 +152,7 @@ export default async function CredentialsPage({
                 buildHref={buildSortHref}
               />
               <TableHead>Password</TableHead>
+              <TableHead>Categoria</TableHead>
               <TableHead>Custo</TableHead>
               <TableHead>Responsável</TableHead>
               <TableHead>Criado por</TableHead>
@@ -159,6 +165,7 @@ export default async function CredentialsPage({
                 key={credential.id}
                 credential={credential}
                 members={members}
+                categories={categories}
                 canDelete={isOwner || credential.createdById === userId}
                 copyTargetProjects={copyTargetProjects}
               />

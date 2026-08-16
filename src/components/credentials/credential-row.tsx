@@ -5,8 +5,13 @@ import { toast } from "sonner";
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { BillingCycle } from "@prisma/client";
 
-import { copyCredentialToProjectAction, revealCredentialAction } from "@/actions/credentials";
+import {
+  copyCredentialToProjectAction,
+  revealCredentialAction,
+  type CredentialCategoryOption,
+} from "@/actions/credentials";
 import { formatCredentialCost } from "@/components/credentials/billing-cycle";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { EditCredentialDialog } from "@/components/credentials/edit-credential-dialog";
@@ -18,12 +23,15 @@ type Project = { id: string; name: string };
 
 type Credential = {
   id: string;
+  projectId: string;
   serviceName: string;
   url: string | null;
   username: string | null;
   assigneeId: string | null;
   assignee: { name: string | null; email: string | null } | null;
   createdBy: { name: string | null; email: string | null };
+  categoryId: string | null;
+  category: { name: string; color: string } | null;
   cost: number | null;
   billingCycle: BillingCycle | null;
 };
@@ -40,11 +48,13 @@ export async function copyToClipboard(value: string, label: string) {
 export function CredentialRow({
   credential,
   members,
+  categories,
   canDelete,
   copyTargetProjects,
 }: {
   credential: Credential;
   members: Member[];
+  categories: CredentialCategoryOption[];
   canDelete: boolean;
   copyTargetProjects: Project[];
 }) {
@@ -152,6 +162,22 @@ export function CredentialRow({
         </div>
       </TableCell>
       <TableCell>
+        {credential.category ? (
+          <Badge
+            variant="outline"
+            className="border-transparent"
+            style={{
+              backgroundColor: `${credential.category.color}33`,
+              color: credential.category.color,
+            }}
+          >
+            {credential.category.name}
+          </Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        )}
+      </TableCell>
+      <TableCell>
         <span className="text-sm">
           {formatCredentialCost(credential.cost, credential.billingCycle) ?? "—"}
         </span>
@@ -177,6 +203,7 @@ export function CredentialRow({
           <EditCredentialDialog
             credential={credential}
             members={members}
+            categories={categories}
             open={editOpen}
             onOpenChange={setEditOpen}
           />

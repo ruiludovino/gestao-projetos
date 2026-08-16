@@ -8,6 +8,7 @@ export const createCredentialSchema = z.object({
   password: z.string().min(1, "A password é obrigatória").max(500),
   notes: z.string().max(5000).optional().or(z.literal("")),
   assigneeId: z.string().optional().or(z.literal("")),
+  categoryId: z.string().optional().or(z.literal("")),
   cost: z
     .string()
     .optional()
@@ -19,4 +20,9 @@ export const createCredentialSchema = z.object({
 export const updateCredentialSchema = createCredentialSchema.extend({
   // password opcional na edicao: vazio mantem a password atual
   password: z.string().max(500).optional().or(z.literal("")),
+});
+
+export const credentialCategorySchema = z.object({
+  name: z.string().min(1, "Nome da categoria obrigatório").max(60),
+  color: z.string().min(1).max(20),
 });
