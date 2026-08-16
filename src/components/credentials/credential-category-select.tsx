@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Check, ChevronsUpDown, Pencil, Plus, Trash2, X } from "lucide-react";
 
@@ -45,10 +45,6 @@ export function CredentialCategorySelect({
 }) {
   const [categories, setCategories] = useState(initialCategories);
   const [selectedId, setSelectedId] = useState<string | null>(defaultValue ?? null);
-
-  useEffect(() => {
-    setCategories(initialCategories);
-  }, [initialCategories]);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");

@@ -22,6 +22,7 @@ import {
   type SortDir,
 } from "@/components/credentials/sortable-credential-head";
 import { AssigneeFilter } from "@/components/shared/assignee-filter";
+import { CategoryFilter } from "@/components/credentials/category-filter";
 import { CopyToProjectDialog } from "@/components/shared/copy-to-project-dialog";
 import { copyAllCredentialsToProjectAction } from "@/actions/credentials";
 
@@ -32,10 +33,16 @@ export default async function CredentialsPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ responsavel?: string; q?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{
+    responsavel?: string;
+    categoria?: string;
+    q?: string;
+    sort?: string;
+    dir?: string;
+  }>;
 }) {
   const { projectId } = await params;
-  const { responsavel, q, sort, dir } = await searchParams;
+  const { responsavel, categoria, q, sort, dir } = await searchParams;
   const sortField: CredentialSortField = SORT_FIELDS.includes(sort as CredentialSortField)
     ? (sort as CredentialSortField)
     : "serviceName";
@@ -59,6 +66,7 @@ export default async function CredentialsPage({
       where: {
         projectId,
         ...(responsavel ? { assigneeId: responsavel } : {}),
+        ...(categoria ? { categoryId: categoria } : {}),
         ...(q
           ? {
               OR: [
@@ -90,6 +98,7 @@ export default async function CredentialsPage({
   function buildSortHref(field: CredentialSortField, nextDir: SortDir) {
     const params = new URLSearchParams();
     if (responsavel) params.set("responsavel", responsavel);
+    if (categoria) params.set("categoria", categoria);
     if (q) params.set("q", q);
     params.set("sort", field);
     params.set("dir", nextDir);
@@ -109,6 +118,7 @@ export default async function CredentialsPage({
         <div className="flex items-center gap-2">
           <CredentialsSearch />
           <AssigneeFilter members={members} />
+          {categories.length > 0 && <CategoryFilter categories={categories} />}
           {credentials.length > 0 && copyTargetProjects.length > 0 && (
             <CopyToProjectDialog
               projects={copyTargetProjects}
@@ -129,7 +139,7 @@ export default async function CredentialsPage({
 
       {credentials.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {q || responsavel
+          {q || responsavel || categoria
             ? "Nenhuma credencial encontrada para essa pesquisa."
             : "Ainda não há credenciais guardadas."}
         </p>
